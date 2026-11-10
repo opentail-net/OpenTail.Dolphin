@@ -94,7 +94,7 @@ public sealed class YouTubeConnector : ISourceConnector, IDisposable
             {
                 using var req = new HttpRequestMessage(HttpMethod.Get, url);
                 req.Headers.Add("X-Goog-Api-Key", _apiKey);
-                var resp = await _http.SendAsync(req, cancellationToken);
+                using var resp = await _http.SendAsync(req, cancellationToken);
                 resp.EnsureSuccessStatusCode();
                 response = JsonSerializer.Deserialize<YtSearchResponse>(
                     await resp.Content.ReadAsStringAsync(cancellationToken), _json);
@@ -174,7 +174,7 @@ public sealed class YouTubeConnector : ISourceConnector, IDisposable
             {
                 using var req = new HttpRequestMessage(HttpMethod.Get, url);
                 req.Headers.Add("X-Goog-Api-Key", _apiKey);
-                var resp = await _http.SendAsync(req, cancellationToken);
+                using var resp = await _http.SendAsync(req, cancellationToken);
                 resp.EnsureSuccessStatusCode();
                 response = JsonSerializer.Deserialize<YtCommentThreadResponse>(
                     await resp.Content.ReadAsStringAsync(cancellationToken), _json);
@@ -233,7 +233,7 @@ public sealed class YouTubeConnector : ISourceConnector, IDisposable
             var url = $"{ApiBase}/videos?part=statistics&id={ids}";
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.Add("X-Goog-Api-Key", _apiKey);
-            var resp = await _http.SendAsync(req, cancellationToken);
+            using var resp = await _http.SendAsync(req, cancellationToken);
             resp.EnsureSuccessStatusCode();
             var body = JsonSerializer.Deserialize<YtVideoListResponse>(
                 await resp.Content.ReadAsStringAsync(cancellationToken), _json);
@@ -251,7 +251,7 @@ public sealed class YouTubeConnector : ISourceConnector, IDisposable
     {
         if (_cache.Remove(item.Id, out var yt))
             return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(yt));
-        return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(new { id = item.Id, title = item.DisplayName }));
+        return Task.FromException<byte[]>(new KeyNotFoundException($"YouTube video '{item.Id}' is not in the discovery cache. Discover it again before fetching it."));
     }
 
     private static long ParseLong(string? s) =>

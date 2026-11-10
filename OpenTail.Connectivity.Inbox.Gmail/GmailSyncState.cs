@@ -1,15 +1,22 @@
 using System.Text.Json;
+using OpenTail.Connectivity.Files;
 
 namespace OpenTail.Connectivity.Inbox.Gmail;
 
 /// <param name="CoveredUntil">All mail up to this time is known read (null in state saved by earlier versions).</param>
 /// <param name="Backfill">A full listing an expired history id started, not finished yet.</param>
+/// <param name="Folder">The Gmail label the state belongs to: INBOX, SENT, DRAFT, SPAM or TRASH. Mailbox history ids are shared by all labels, so each label keeps its own state.</param>
 public sealed record GmailSyncState(
     string UserEmail,
     string? HistoryId,
     DateTimeOffset LastFetchAt,
     DateTimeOffset? CoveredUntil = null,
-    GmailBackfill? Backfill = null);
+    GmailBackfill? Backfill = null,
+    string Folder = GmailFolders.Inbox)
+{
+    /// <summary>The INBOX keeps the key it always had (the address alone), so its state is not read again. Other labels add the label.</summary>
+    internal string Key => Folder == GmailFolders.Inbox ? UserEmail : UserEmail + "|" + Folder;
+}
 
 /// <summary>Mail between <paramref name="After"/> and <paramref name="Before"/> (Unix seconds; no upper bound when null) still to be
 /// read. Listing is newest first, so each run reads the newest part and lowers <paramref name="Before"/>.</summary>
@@ -20,8 +27,8 @@ public sealed record GmailBackfill(long After, long? Before)
 
 public sealed class GmailSyncStateStore
 {
+    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private readonly string _filePath;
-    private static readonly JsonSerializerOptions _writeOptions = new() { WriteIndented = true };
 
     public GmailSyncStateStore(string filePath)
     {
@@ -29,41 +36,16 @@ public sealed class GmailSyncStateStore
         _filePath = filePath;
     }
 
-    public async Task<GmailSyncState?> TryLoadAsync(string userEmail, CancellationToken ct = default)
+    /// <summary>The state of the INBOX of <paramref name="userEmail"/>.</summary>
+    public Task<GmailSyncState?> TryLoadAsync(string userEmail, CancellationToken ct = default) => TryLoadAsync(userEmail, GmailFolders.Inbox, ct);
+
+    public async Task<GmailSyncState?> TryLoadAsync(string userEmail, string folder, CancellationToken ct = default)
     {
-        if (!File.Exists(_filePath)) return null;
-        try
-        {
-            await using var stream = File.OpenRead(_filePath);
-            var states = await JsonSerializer.DeserializeAsync<Dictionary<string, GmailSyncState>>(stream, cancellationToken: ct);
-            return states?.GetValueOrDefault(userEmail);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
+        var key = new GmailSyncState(userEmail, null, default, Folder: folder).Key;
+        var entries = await LockedJsonState.ReadAsync<GmailSyncState>(_filePath, Json, ct);
+        return entries.GetValueOrDefault(key);
     }
 
-    public async Task SaveAsync(GmailSyncState state, CancellationToken ct = default)
-    {
-        Dictionary<string, GmailSyncState> states;
-        if (File.Exists(_filePath))
-        {
-            try
-            {
-                await using var rs = File.OpenRead(_filePath);
-                states = await JsonSerializer.DeserializeAsync<Dictionary<string, GmailSyncState>>(rs, cancellationToken: ct)
-                    ?? [];
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException) { states = []; }
-        }
-        else
-        {
-            states = [];
-            var dir = Path.GetDirectoryName(_filePath);
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        }
-
-        states[state.UserEmail] = state;
-        await OpenTail.Connectivity.Files.AtomicFile.WriteAllTextAsync(_filePath,
-            JsonSerializer.Serialize(states, _writeOptions),
-            ct);
-    }
+    public Task SaveAsync(GmailSyncState state, CancellationToken ct = default) =>
+        LockedJsonState.UpdateAsync(_filePath, state.Key, state, Json, ct);
 }

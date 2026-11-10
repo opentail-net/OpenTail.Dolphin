@@ -110,27 +110,11 @@ public sealed class InMemoryMemoryOperatorControlService : IMemoryOperatorContro
         if (!TryGetRecord(request.RecordId, out var record))
             return FailMissingRecord(request.RecordId, "re-embed");
 
-        var revision = string.IsNullOrWhiteSpace(request.EmbeddingRevision)
-            ? DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture)
-            : request.EmbeddingRevision!.Trim();
-
-        var embedding = record.Embedding;
-        if (embedding is null)
-        {
-            embedding = new MemoryEmbeddingRef(
-                Model: new MemoryEmbeddingModel("operator", "reembed", revision, 0, "cosine"),
-                VectorId: $"reembed-{record.Id}");
-        }
-        else
-        {
-            embedding = embedding with
-            {
-                Model = embedding.Model with { Revision = revision }
-            };
-        }
-
-        _records[record.Id] = record with { Embedding = embedding };
-        return (true, $"Re-embedded memory record '{request.RecordId}' with revision '{revision}'.", null);
+        // Re-embedding needs an embedding service, which this operator service does not have. Changing only the revision would
+        // claim a vector that was never produced, and a placeholder would fail validation, so nothing is changed and this is refused.
+        return (false,
+            $"Cannot re-embed '{record.Id}': this operator service has no embedding service. Nothing was changed; re-embed through the ingestion worker.",
+            null);
     }
 
     private (bool Success, string Message, IReadOnlyDictionary<string, string>? Metadata) MergeDuplicates(MemoryOperatorActionRequest request)
@@ -245,15 +229,38 @@ public sealed class InMemoryMemoryOperatorControlService : IMemoryOperatorContro
         if (request.RetentionClass is null)
             return (false, "Cannot update retention because retention class is missing.", null);
 
-        _records[record.Id] = record with
+        var retention = request.RetentionClass.Value;
+        DateTimeOffset? expiresAt = null;
+        if (retention == MemoryRetentionClass.Expiring)
+        {
+            if (request.ExpiresAtUtc is null)
+                return (false, $"Cannot set '{record.Id}' to Expiring without an expiry date (ExpiresAtUtc). Nothing was changed.", null);
+            if (request.ExpiresAtUtc <= DateTimeOffset.UtcNow)
+                return (false, $"The expiry date for '{record.Id}' must be in the future. Nothing was changed.", null);
+            expiresAt = request.ExpiresAtUtc;
+        }
+
+        var updated = record with
         {
             Policy = record.Policy with
             {
-                RetentionClass = request.RetentionClass.Value,
+                RetentionClass = retention,
+                ExpiresAtUtc = expiresAt,
             }
         };
 
-        return (true, $"Updated retention for '{record.Id}' to '{request.RetentionClass}'.", null);
+        // The resulting record is validated before the change is reported: an invalid record is never stored.
+        try
+        {
+            MemoryContractValidation.Validate(updated);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return (false, $"Retention for '{record.Id}' was not changed: {ex.Message}", null);
+        }
+
+        _records[record.Id] = updated;
+        return (true, $"Updated retention for '{record.Id}' to '{retention}'.", null);
     }
 
     private MemoryOperatorAuditEntry CreateAudit(

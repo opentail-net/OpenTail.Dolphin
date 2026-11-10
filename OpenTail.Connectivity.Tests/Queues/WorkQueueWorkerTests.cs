@@ -218,6 +218,27 @@ public sealed class WorkQueueWorkerTests
     }
 
     [Fact]
+    public async Task A_handler_that_ends_after_its_run_time_limit_but_before_the_grace_period_is_timed_out_and_retried_not_completed()
+    {
+        var queue = new InMemoryWorkQueue();
+        await queue.EnqueueAsync(new EnqueueRequest(Q, "acme", "late", ConcurrencyKey: "db:a"), TestContext.Current.CancellationToken);
+        var calls = 0;
+
+        // The first attempt ignores its cancellation and returns successfully 250 ms in: past the 100 ms limit, well inside the 5 s grace.
+        var events = await RunUntilAsync(queue, Options(retryBase: TimeSpan.FromMilliseconds(50), maxRun: TimeSpan.FromMilliseconds(100)),
+            async (_, _) =>
+            {
+                if (Interlocked.Increment(ref calls) == 1)
+                    await Task.Delay(250, CancellationToken.None);
+            },
+            e => e.Any(x => x.Kind == WorkerEventKind.Completed));
+
+        Assert.StartsWith("timed out after", Assert.Single(events, e => e.Kind == WorkerEventKind.TimedOut).Detail);
+        Assert.DoesNotContain(events, e => e.Kind == WorkerEventKind.Completed && e.Attempt == 1);
+        Assert.Equal(2, Assert.Single(events, e => e.Kind == WorkerEventKind.Completed).Attempt);
+    }
+
+    [Fact]
     public async Task A_handler_that_ignores_cancellation_is_a_zombie_and_its_key_is_not_leased_until_it_ends()
     {
         var queue = new InMemoryWorkQueue(new WorkQueueOptions(ConcurrencyLimits: new Dictionary<string, int> { ["db:a"] = 1 }));

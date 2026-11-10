@@ -1,17 +1,24 @@
 using System.Text.Json;
+using OpenTail.Connectivity.Files;
 
 namespace OpenTail.Connectivity.Inbox.Imap;
 
+/// <param name="Account">The account the state belongs to (see <see cref="ImapMessageLookup.Account"/>). Part of the key: UIDs are only meaningful for one account's folder.</param>
 public sealed record ImapSyncState(
     string Folder,
     uint UidValidity,
     uint HighestSeenUid,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string Account)
+{
+    internal string Key => Account + "|" + Folder;
+}
 
+/// <summary>Highest seen UIDs per account and folder, in one file. Each save changes one entry under a lock (see <see cref="LockedJsonState"/>).</summary>
 public sealed class ImapSyncStateStore
 {
+    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     private readonly string _filePath;
-    private static readonly JsonSerializerOptions _writeOptions = new() { WriteIndented = true };
 
     public ImapSyncStateStore(string filePath)
     {
@@ -19,41 +26,13 @@ public sealed class ImapSyncStateStore
         _filePath = filePath;
     }
 
-    public async Task<ImapSyncState?> TryLoadAsync(string folder, CancellationToken ct = default)
+    public async Task<ImapSyncState?> TryLoadAsync(string account, string folder, CancellationToken ct = default)
     {
-        if (!File.Exists(_filePath)) return null;
-        try
-        {
-            await using var stream = File.OpenRead(_filePath);
-            var states = await JsonSerializer.DeserializeAsync<Dictionary<string, ImapSyncState>>(stream, cancellationToken: ct);
-            return states?.GetValueOrDefault(folder);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
+        var key = new ImapSyncState(folder, 0, 0, default, account).Key;
+        var entries = await LockedJsonState.ReadAsync<ImapSyncState>(_filePath, Json, ct);
+        return entries.GetValueOrDefault(key);
     }
 
-    public async Task SaveAsync(ImapSyncState state, CancellationToken ct = default)
-    {
-        Dictionary<string, ImapSyncState> states;
-        if (File.Exists(_filePath))
-        {
-            try
-            {
-                await using var readStream = File.OpenRead(_filePath);
-                states = await JsonSerializer.DeserializeAsync<Dictionary<string, ImapSyncState>>(readStream, cancellationToken: ct)
-                    ?? new Dictionary<string, ImapSyncState>();
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException) { states = new Dictionary<string, ImapSyncState>(); }
-        }
-        else
-        {
-            states = new Dictionary<string, ImapSyncState>();
-            var dir = Path.GetDirectoryName(_filePath);
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        }
-
-        states[state.Folder] = state;
-        await OpenTail.Connectivity.Files.AtomicFile.WriteAllTextAsync(_filePath,
-            JsonSerializer.Serialize(states, _writeOptions),
-            ct);
-    }
+    public Task SaveAsync(ImapSyncState state, CancellationToken ct = default) =>
+        LockedJsonState.UpdateAsync(_filePath, state.Key, state, Json, ct);
 }

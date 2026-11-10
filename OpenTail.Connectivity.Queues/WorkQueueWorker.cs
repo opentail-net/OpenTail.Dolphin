@@ -200,10 +200,20 @@ public sealed class WorkQueueWorker(
         var heartbeats = _options.HeartbeatTimeout is { } beat
             ? WatchHeartbeatsAsync(context, beat, () => { stopReason = $"no heartbeat for {beat}"; gaveUp.Cancel(); }, renewingOrGaveUp.Token)
             : Task.CompletedTask;
+        // Set when the handler ends: true only if the run-time limit (or a missed heartbeat) had not been reached by then. A handler
+        // that ends after it, even successfully because it ignored its cancellation, is a timeout: its result is not kept.
+        var endedInTime = false;
         var handlerTask = Task.Run(async () =>
         {
             JobContext.CurrentContext.Value = context;
-            await _handler(job, both.Token).ConfigureAwait(false);
+            try
+            {
+                await _handler(job, both.Token).ConfigureAwait(false);
+            }
+            finally
+            {
+                endedInTime = !gaveUp.IsCancellationRequested;
+            }
         }, CancellationToken.None);
 
         // Wait for the handler, or for the worker to give up on it (run-time limit, missed heartbeat) or to stop.
@@ -255,7 +265,7 @@ public sealed class WorkQueueWorker(
             return;
         }
 
-        if (gaveUp.IsCancellationRequested && failure is not null)
+        if (gaveUp.IsCancellationRequested && !endedInTime)
         {
             JobTrace.Failed(activity, stopReason!);
             await GiveBackAsync(job, stopReason!).ConfigureAwait(false);

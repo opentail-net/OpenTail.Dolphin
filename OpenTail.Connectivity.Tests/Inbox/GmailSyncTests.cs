@@ -7,7 +7,8 @@ using OpenTail.Connectivity.Inbox.Gmail;
 
 namespace OpenTail.Connectivity.Tests.Inbox;
 
-/// <summary>Gmail sync against a fake mailbox: an expired history id never skips mail, and a transient error never moves the state.</summary>
+/// <summary>Gmail sync against a fake mailbox: an expired history id never skips mail, a transient error never moves the state, and each
+/// folder reads only its own label.</summary>
 public sealed class GmailSyncTests : IDisposable
 {
     private readonly string _stateFile = Path.Combine(Path.GetTempPath(), "gmail-sync-" + Guid.NewGuid().ToString("N") + ".json");
@@ -18,13 +19,19 @@ public sealed class GmailSyncTests : IDisposable
         if (File.Exists(_stateFile)) File.Delete(_stateFile);
     }
 
-    /// <summary>Messages with internal dates; history answers 404 (expired), 503 (down) or an empty page at the current id.</summary>
+    /// <summary>Messages with internal dates and labels (INBOX unless set); history answers 404 (expired), 503 (down) or the records of
+    /// <see cref="Added"/> at the current id.</summary>
     private sealed class Mailbox : HttpMessageHandler
     {
         public List<(string Id, DateTimeOffset At)> Messages { get; } = [];
+        public Dictionary<string, string> Labels { get; } = new(StringComparer.Ordinal);
+        public List<string> Added { get; } = [];
         public HttpStatusCode HistoryStatus { get; set; } = HttpStatusCode.OK;
         public string CurrentHistoryId { get; set; } = "500";
         public List<string> Calls { get; } = [];
+        public List<string> LabelRequests { get; } = [];
+
+        private string LabelOf(string id) => Labels.TryGetValue(id, out var label) ? label : "INBOX";
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -34,15 +41,22 @@ public sealed class GmailSyncTests : IDisposable
             if (path.EndsWith("/profile"))
                 return Json($$"""{"emailAddress":"me@example.com","historyId":"{{CurrentHistoryId}}"}""");
             if (path.EndsWith("/history"))
-                return HistoryStatus == HttpStatusCode.OK
-                    ? Json($$"""{"historyId":"{{CurrentHistoryId}}"}""")
-                    : Json("{\"error\":{\"code\":" + (int)HistoryStatus + ",\"message\":\"no\"}}", HistoryStatus);
+            {
+                if (HistoryStatus != HttpStatusCode.OK)
+                    return Json("{\"error\":{\"code\":" + (int)HistoryStatus + ",\"message\":\"no\"}}", HistoryStatus);
+                var records = string.Join(",", Added.Select((id, i) =>
+                    "{\"id\":\"" + (i + 1) + "\",\"messagesAdded\":[{\"message\":{\"id\":\"" + id + "\"}}]}"));
+                return Json("{\"historyId\":\"" + CurrentHistoryId + "\"" + (Added.Count == 0 ? "" : ",\"history\":[" + records + "]") + "}");
+            }
             if (path.EndsWith("/messages"))
             {
                 var q = query["q"] ?? "";
                 long after = Regex.Match(q, @"after:(\d+)") is { Success: true } a ? long.Parse(a.Groups[1].Value) : long.MinValue;
                 long before = Regex.Match(q, @"before:(\d+)") is { Success: true } b ? long.Parse(b.Groups[1].Value) : long.MaxValue;
+                var wanted = query.GetValues("labelIds") ?? [];
+                LabelRequests.AddRange(wanted);
                 var matching = Messages.Where(m => m.At.ToUnixTimeSeconds() > after && m.At.ToUnixTimeSeconds() < before)
+                    .Where(m => wanted.All(label => LabelOf(m.Id) == label))
                     .OrderByDescending(m => m.At).ToList();
                 var offset = int.TryParse(query["pageToken"], out var o) ? o : 0;
                 var size = int.Parse(query["maxResults"] ?? "100");
@@ -52,8 +66,9 @@ public sealed class GmailSyncTests : IDisposable
             }
             var id = path.Split('/').Last();
             var msg = Messages.Single(m => m.Id == id);
+            var label = LabelOf(id);
             return Json($$$"""
-                {"id":"{{{id}}}","labelIds":["INBOX"],"internalDate":"{{{msg.At.ToUnixTimeMilliseconds()}}}",
+                {"id":"{{{id}}}","labelIds":["{{{label}}}"],"internalDate":"{{{msg.At.ToUnixTimeMilliseconds()}}}",
                  "payload":{"mimeType":"text/plain","headers":[{"name":"Message-ID","value":"<{{{id}}}@example.com>"},{"name":"Subject","value":"{{{id}}}"}],
                  "body":{"data":"aGk"}
                  }
@@ -80,10 +95,10 @@ public sealed class GmailSyncTests : IDisposable
             }),
         };
 
-    private async Task<List<string>> RunAsync(Mailbox mailbox, int max)
+    private async Task<List<string>> RunAsync(Mailbox mailbox, int max, string folder = "INBOX")
     {
         var subjects = new List<string>();
-        await foreach (var r in Adapter(mailbox).FetchRecentAsync(new InboxFetchOptions(MaxMessages: max), TestContext.Current.CancellationToken))
+        await foreach (var r in Adapter(mailbox).FetchRecentAsync(new InboxFetchOptions(folder, max), TestContext.Current.CancellationToken))
             subjects.Add(r.Subject);
         return subjects;
     }
@@ -152,5 +167,59 @@ public sealed class GmailSyncTests : IDisposable
 
         Assert.True(mailbox.Calls.IndexOf("profile") < mailbox.Calls.IndexOf("messages"));
         Assert.Equal("500", (await LoadAsync())!.HistoryId);
+    }
+
+    [Fact]
+    public async Task Sent_lists_only_sent_mail_and_the_inbox_is_not_read_for_it()
+    {
+        var mailbox = new Mailbox();
+        mailbox.Messages.Add(("in1", T0.AddHours(1)));
+        mailbox.Messages.Add(("out1", T0.AddHours(2)));
+        mailbox.Labels["out1"] = "SENT";
+
+        Assert.Equal(["out1"], await RunAsync(mailbox, max: 10, folder: "Sent"));
+        Assert.Equal(["SENT"], mailbox.LabelRequests);
+    }
+
+    [Fact]
+    public async Task History_for_sent_keeps_only_sent_mail()
+    {
+        var mailbox = new Mailbox();
+        mailbox.Messages.Add(("in1", T0.AddHours(1)));
+        mailbox.Messages.Add(("out1", T0.AddHours(2)));
+        mailbox.Labels["out1"] = "SENT";
+        mailbox.Added.AddRange(["in1", "out1"]);
+        await new GmailSyncStateStore(_stateFile).SaveAsync(
+            new GmailSyncState("me@example.com", "100", T0, CoveredUntil: T0, Folder: "SENT"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(["out1"], await RunAsync(mailbox, max: 10, folder: "Sent"));
+    }
+
+    [Fact]
+    public async Task A_folder_that_is_not_a_system_label_is_refused_before_any_request()
+    {
+        var mailbox = new Mailbox();
+        mailbox.Messages.Add(("m1", T0.AddHours(1)));
+
+        var error = await Assert.ThrowsAsync<ArgumentException>(() => RunAsync(mailbox, max: 10, folder: "Projects/Alpha"));
+
+        Assert.Contains("not supported", error.Message, StringComparison.Ordinal);
+        Assert.Empty(mailbox.Calls);
+    }
+
+    [Fact]
+    public async Task Each_folder_keeps_its_own_state_and_the_inbox_state_is_left_alone()
+    {
+        var mailbox = new Mailbox();
+        mailbox.Messages.Add(("in1", T0.AddHours(1)));
+        mailbox.Labels["out1"] = "SENT";
+        mailbox.Messages.Add(("out1", T0.AddHours(2)));
+
+        await RunAsync(mailbox, max: 10);
+        await RunAsync(mailbox, max: 10, folder: "Sent");
+
+        var store = new GmailSyncStateStore(_stateFile);
+        Assert.Equal("500", (await store.TryLoadAsync("me@example.com", TestContext.Current.CancellationToken))!.HistoryId);
+        Assert.Equal("500", (await store.TryLoadAsync("me@example.com", "SENT", TestContext.Current.CancellationToken))!.HistoryId);
     }
 }

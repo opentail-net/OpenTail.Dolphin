@@ -78,7 +78,22 @@ public sealed class DropboxConnector : IIncrementalSourceConnector
         string? cursor,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        // The saved cursor says which file filter it was made under. A different filter, or a cursor saved before the fingerprint
+        // existed, lists the folder again, so files the new filter admits are not missed behind the saved position.
         var currentCursor = cursor;
+        if (cursor is not null)
+        {
+            var colon = cursor.IndexOf(':');
+            if (colon > 0 && cursor[..colon] == _filter.Fingerprint)
+            {
+                currentCursor = cursor[(colon + 1)..];
+            }
+            else
+            {
+                yield return new SourceChange.Reset("the file filter changed or the saved cursor predates it; listing the folder again");
+                currentCursor = null;
+            }
+        }
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -118,12 +133,18 @@ public sealed class DropboxConnector : IIncrementalSourceConnector
                     yield return new SourceChange.Delete(SourceRef(info.Key), DeletionReason.OutOfScope, _tenantContext);
             }
 
-            yield return new SourceChange.Checkpoint(currentPage.Cursor);
+            yield return new SourceChange.Checkpoint(CursorFor(currentPage.Cursor));
             if (!currentPage.HasMore)
                 yield break;
             currentCursor = currentPage.Cursor;
         }
     }
+
+    /// <summary>The file filter's fingerprint, which a saved cursor carries. Internal for tests.</summary>
+    internal string CursorFingerprint => _filter.Fingerprint;
+
+    /// <summary>The saved form of Dropbox's cursor: the fingerprint of the file filter, a colon, then Dropbox's own cursor.</summary>
+    private string CursorFor(string nativeCursor) => _filter.Fingerprint + ":" + nativeCursor;
 
     public Task<byte[]> FetchAsync(SourceItem item, CancellationToken cancellationToken = default) =>
         _fetcher.FetchAsync(item, cancellationToken);

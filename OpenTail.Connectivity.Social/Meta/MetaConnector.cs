@@ -111,7 +111,7 @@ public sealed class MetaConnector : ISourceConnector, IDisposable
             FbPagePostsResponse? response = null;
             try
             {
-                var resp = await GetAsync(url, cancellationToken);
+                using var resp = await GetAsync(url, cancellationToken);
                 resp.EnsureSuccessStatusCode();
                 response = JsonSerializer.Deserialize<FbPagePostsResponse>(
                     await resp.Content.ReadAsStringAsync(cancellationToken), _json);
@@ -170,7 +170,7 @@ public sealed class MetaConnector : ISourceConnector, IDisposable
             IgMediaResponse? response = null;
             try
             {
-                var resp = await GetAsync(url, cancellationToken);
+                using var resp = await GetAsync(url, cancellationToken);
                 resp.EnsureSuccessStatusCode();
                 response = JsonSerializer.Deserialize<IgMediaResponse>(
                     await resp.Content.ReadAsStringAsync(cancellationToken), _json);
@@ -216,7 +216,7 @@ public sealed class MetaConnector : ISourceConnector, IDisposable
     {
         if (_cache.TryGetValue(item.Id, out var mp))
             return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(mp));
-        return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(new { id = item.Id }));
+        return Task.FromException<byte[]>(new KeyNotFoundException($"Meta post '{item.Id}' is not in the cache. Discover it again before fetching it."));
     }
 
     private void CachePost(string id, MetaPost post)

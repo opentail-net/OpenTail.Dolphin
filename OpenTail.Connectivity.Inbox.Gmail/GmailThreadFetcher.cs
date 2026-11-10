@@ -19,7 +19,7 @@ public sealed class GmailThreadFetcher : IEmailThreadFetcher
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var credential = await BuildCredentialAsync(ct);
-        var service = new GmailService(new BaseClientService.Initializer
+        using var service = new GmailService(new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
             ApplicationName = "OpenTail-Connectivity"

@@ -28,7 +28,8 @@ public sealed record MemoryOperatorActionRequest(
     MemoryRetentionClass? RetentionClass = null,
     string? Note = null,
     string? EmbeddingRevision = null,
-    DateTimeOffset? TimestampUtc = null);
+    DateTimeOffset? TimestampUtc = null,
+    DateTimeOffset? ExpiresAtUtc = null);
 
 public sealed record MemoryOperatorAuditEntry(
     string AuditId,

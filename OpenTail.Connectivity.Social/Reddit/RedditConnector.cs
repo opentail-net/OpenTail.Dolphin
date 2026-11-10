@@ -66,7 +66,7 @@ public sealed class RedditConnector : ISourceConnector
             RedditListingResponse? listing = null;
             try
             {
-                var response = await _http.GetAsync(url, cancellationToken);
+                using var response = await _http.GetAsync(url, cancellationToken);
                 response.EnsureSuccessStatusCode();
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
                 listing = JsonSerializer.Deserialize<RedditListingResponse>(json, _json);
@@ -115,9 +115,8 @@ public sealed class RedditConnector : ISourceConnector
         if (_postCache.Remove(item.Id, out var post))
             return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(post));
 
-        // Fallback: return minimal JSON so the pipeline doesn't fail
-        var minimal = JsonSerializer.SerializeToUtf8Bytes(new { id = item.Id, title = item.DisplayName });
-        return Task.FromResult(minimal);
+        // Nothing is made up for an item that is no longer cached: a fetch that cannot find the original fails.
+        return Task.FromException<byte[]>(new KeyNotFoundException($"Reddit post '{item.Id}' is not in the discovery cache. Discover it again before fetching it."));
     }
 
     private string BuildUrl(int limit, string? after)

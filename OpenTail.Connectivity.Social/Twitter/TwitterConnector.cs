@@ -63,7 +63,7 @@ public sealed class TwitterConnector : ISourceConnector, IDisposable
             {
                 using var req = new HttpRequestMessage(HttpMethod.Get, url);
                 req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _bearerToken);
-                var resp = await _http.SendAsync(req, cancellationToken);
+                using var resp = await _http.SendAsync(req, cancellationToken);
                 resp.EnsureSuccessStatusCode();
                 var json = await resp.Content.ReadAsStringAsync(cancellationToken);
                 response = JsonSerializer.Deserialize<TwitterSearchResponse>(json, _json);
@@ -118,7 +118,7 @@ public sealed class TwitterConnector : ISourceConnector, IDisposable
         if (_cache.Remove(item.Id, out var tweet))
             return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(tweet));
 
-        return Task.FromResult(JsonSerializer.SerializeToUtf8Bytes(new { id = item.Id, text = item.DisplayName }));
+        return Task.FromException<byte[]>(new KeyNotFoundException($"Tweet '{item.Id}' is not in the discovery cache. Discover it again before fetching it."));
     }
 
     private string BuildUrl(int maxResults, string? nextToken)

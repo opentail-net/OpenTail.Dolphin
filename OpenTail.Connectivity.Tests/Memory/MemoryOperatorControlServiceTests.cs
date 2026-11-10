@@ -82,8 +82,9 @@ public class MemoryOperatorControlServiceTests
             Actor: "operator",
             RecordId: "rec-1",
             EmbeddingRevision: "rev-ops"));
-        Assert.True(reembed.Success);
-        Assert.Equal("rev-ops", reembed.Snapshot.Records["rec-1"].Embedding!.Model.Revision);
+        // No embedding service here: refused, and the record keeps its embedding instead of a changed revision.
+        Assert.False(reembed.Success);
+        Assert.NotEqual("rev-ops", reembed.Snapshot.Records["rec-1"].Embedding?.Model.Revision);
 
         var relabel = service.Apply(new MemoryOperatorActionRequest(
             Kind: MemoryOperatorActionKind.RelabelEntity,
@@ -98,8 +99,19 @@ public class MemoryOperatorControlServiceTests
             Actor: "operator",
             RecordId: "rec-1",
             RetentionClass: MemoryRetentionClass.Expiring));
-        Assert.True(retention.Success);
-        Assert.Equal(MemoryRetentionClass.Expiring, retention.Snapshot.Records["rec-1"].Policy.RetentionClass);
+        // Expiring needs an expiry date: refused without one, and the record is unchanged.
+        Assert.False(retention.Success);
+        Assert.NotEqual(MemoryRetentionClass.Expiring, retention.Snapshot.Records["rec-1"].Policy.RetentionClass);
+
+        var expiring = service.Apply(new MemoryOperatorActionRequest(
+            Kind: MemoryOperatorActionKind.UpdateRetention,
+            Actor: "operator",
+            RecordId: "rec-1",
+            RetentionClass: MemoryRetentionClass.Expiring,
+            ExpiresAtUtc: DateTimeOffset.UtcNow.AddDays(30)));
+        Assert.True(expiring.Success);
+        Assert.Equal(MemoryRetentionClass.Expiring, expiring.Snapshot.Records["rec-1"].Policy.RetentionClass);
+        Assert.NotNull(expiring.Snapshot.Records["rec-1"].Policy.ExpiresAtUtc);
 
         var markStale = service.Apply(new MemoryOperatorActionRequest(
             Kind: MemoryOperatorActionKind.MarkStale,

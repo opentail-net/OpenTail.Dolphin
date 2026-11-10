@@ -45,13 +45,13 @@ public sealed class AtomicFileTests : IDisposable
     public async Task The_inbox_state_stores_write_atomically()
     {
         var imap = Path.Combine(_dir, "imap.json");
-        await new ImapSyncStateStore(imap).SaveAsync(new ImapSyncState("INBOX", 1, 2, DateTimeOffset.UtcNow));
+        await new ImapSyncStateStore(imap).SaveAsync(new ImapSyncState("INBOX", 1, 2, DateTimeOffset.UtcNow, "a@imap.example.com:993"));
         var gmail = Path.Combine(_dir, "gmail.json");
         await new GmailSyncStateStore(gmail).SaveAsync(new GmailSyncState("a@example.com", "42", DateTimeOffset.UtcNow));
         var graph = Path.Combine(_dir, "graph.json");
-        await new GraphSyncStateStore(graph).SaveAsync(new GraphSyncState("a@example.com", "https://graph/delta", DateTimeOffset.UtcNow));
+        await new GraphSyncStateStore(graph).SaveAsync(new GraphSyncState("t", "a@example.com", "https://graph/delta", DateTimeOffset.UtcNow, "inbox"));
 
         Assert.Equal(["gmail.json", "graph.json", "imap.json"], Directory.GetFiles(_dir).Select(Path.GetFileName).Order());
-        Assert.Equal(2u, (await new ImapSyncStateStore(imap).TryLoadAsync("INBOX"))!.HighestSeenUid);
+        Assert.Equal(2u, (await new ImapSyncStateStore(imap).TryLoadAsync("a@imap.example.com:993", "INBOX"))!.HighestSeenUid);
     }
 }

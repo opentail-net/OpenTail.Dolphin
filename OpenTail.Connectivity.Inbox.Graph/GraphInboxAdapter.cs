@@ -40,6 +40,7 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
     /// Messages of one folder, through Graph's delta query. State is kept per mailbox and folder. With saved state the run
     /// continues from the saved link: a delta link (all changes since), or a next link when <see cref="InboxFetchOptions.MaxMessages"/>
     /// stopped the last run, so a backlog is read run by run instead of skipped. Pages are asked for at most MaxMessages long.
+    /// MaxMessages is a soft cap: the run stops at the first page boundary after it is reached, so a page is emitted whole.
     /// </summary>
     public async IAsyncEnumerable<InboxEmailRecord> FetchRecentAsync(
         InboxFetchOptions options,
@@ -49,12 +50,11 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
         var folderPath = options.Folder == "INBOX" ? "inbox" : options.Folder;
         var pageSize = Math.Clamp(options.MaxMessages, 1, 1000);
 
+        // The key is tenant, mailbox and folder. State saved under older keys is not read, so that run is a full one.
         var savedState = _syncStore is null ? null
-            : await _syncStore.TryLoadAsync(_settings.UserEmail, folderPath, cancellationToken)
-              // State saved before it was kept per folder belonged to the inbox.
-              ?? (folderPath == "inbox" ? await _syncStore.TryLoadAsync(_settings.UserEmail, cancellationToken) : null);
+            : await _syncStore.TryLoadAsync(_settings.TenantId, _settings.UserEmail, folderPath, cancellationToken);
 
-        string? pageLink = savedState?.DeltaLink; // the link that fetched the current page; null for the first initial page
+        string? pageLink = savedState?.DeltaLink;
         MessageCollectionResponse? page = pageLink is null
             ? await FirstPageAsync(client, folderPath, options, pageSize, cancellationToken)
             : await SendRawDeltaPageAsync(client, pageLink, pageSize, cancellationToken);
@@ -64,8 +64,9 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
         while (page is not null)
         {
             var messages = (page.Value ?? []).Where(m => m is not null && m.AdditionalData?.ContainsKey("@removed") != true).ToList();
-            var room = options.MaxMessages - emitted;
-            foreach (var msg in messages.Take(Math.Max(0, room)))
+            // A page is emitted whole, even when it is longer than the room left. The run stops at a page boundary, so the saved link
+            // always moves past everything emitted: a page cut in the middle could not be resumed from a link.
+            foreach (var msg in messages)
             {
                 emitted++;
                 yield return GraphMessageMapper.Map(msg, _tenantContext, options.Folder);
@@ -74,23 +75,16 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
             // The SDK maps @odata.nextLink to a property; @odata.deltaLink stays in AdditionalData.
             var deltaLink = GetODataLink(page.AdditionalData, "@odata.deltaLink");
             var nextLink = page.OdataNextLink ?? GetODataLink(page.AdditionalData, "@odata.nextLink");
-            if (messages.Count > room)
-            {
-                // Stopped inside a page: read this page again next time (ids are stable, so repeats overwrite themselves).
-                resumeLink = pageLink;
-                break;
-            }
             if (!string.IsNullOrWhiteSpace(deltaLink)) { resumeLink = deltaLink; break; }
             if (string.IsNullOrWhiteSpace(nextLink)) break;
             if (emitted >= options.MaxMessages) { resumeLink = nextLink; break; }
 
-            pageLink = nextLink;
             page = await SendRawDeltaPageAsync(client, nextLink, pageSize, cancellationToken);
         }
 
         if (_syncStore is not null && resumeLink is not null)
         {
-            _pending = new GraphSyncState(_settings.UserEmail, resumeLink, DateTimeOffset.UtcNow, folderPath);
+            _pending = new GraphSyncState(_settings.TenantId, _settings.UserEmail, resumeLink, DateTimeOffset.UtcNow, folderPath);
             if (_commit == InboxSyncCommit.AfterEnumeration) await CommitSyncStateAsync(cancellationToken);
         }
     }

@@ -5,9 +5,10 @@ public sealed class DefaultMemoryMaintenanceService(IMemoryConsolidator? consoli
 {
     private readonly IMemoryConsolidator? _consolidator = consolidator;
 
-    public async Task<MemoryMaintenanceReport> ExecuteAsync(MemoryMaintenanceRequest request, CancellationToken ct = default)
+    public async Task<MemoryMaintenanceReport> ExecuteAsync(MemoryMaintenanceRequest input, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(input);
+        var request = ScopeTo(input);
 
         var asOf = request.AsOfUtc ?? DateTimeOffset.UtcNow;
         var actions = new List<MemoryMaintenanceAction>();
@@ -80,7 +81,7 @@ public sealed class DefaultMemoryMaintenanceService(IMemoryConsolidator? consoli
     private static void AddDeduplicationActions(MemoryMaintenanceRequest request, List<MemoryMaintenanceAction> actions)
     {
         var duplicateGroups = request.Records
-            .GroupBy(static r => r.DedupeKey ?? $"{r.Source.SourceSystem}:{r.Source.ExternalId}:{r.ContentHash}", StringComparer.Ordinal)
+            .GroupBy(r => ScopeKey(r) + "|" + (r.DedupeKey ?? $"{r.Source.SourceSystem}:{r.Source.ExternalId}:{r.ContentHash}"), StringComparer.Ordinal)
             .Where(static g => g.Count() > 1);
 
         foreach (var group in duplicateGroups)
@@ -158,7 +159,7 @@ public sealed class DefaultMemoryMaintenanceService(IMemoryConsolidator? consoli
 
         var projectGroups = request.Records
             .Where(r => !string.IsNullOrWhiteSpace(r.Source.ProjectScope))
-            .GroupBy(r => r.Source.ProjectScope!, StringComparer.Ordinal);
+            .GroupBy(r => ScopeKey(r), StringComparer.Ordinal);
 
         foreach (var project in projectGroups)
         {
@@ -174,7 +175,7 @@ public sealed class DefaultMemoryMaintenanceService(IMemoryConsolidator? consoli
 
         var byActor = request.Records
             .Where(r => !string.IsNullOrWhiteSpace(r.Source.Actor))
-            .GroupBy(r => r.Source.Actor!, StringComparer.Ordinal)
+            .GroupBy(r => ScopeKey(r) + "|" + r.Source.Actor!, StringComparer.Ordinal)
             .Where(static g => g.Count() >= 2);
 
         foreach (var actorGroup in byActor)
@@ -191,7 +192,7 @@ public sealed class DefaultMemoryMaintenanceService(IMemoryConsolidator? consoli
 
         var unresolved = request.Records
             .Where(r => ContainsAny(r.Content ?? string.Empty, "todo", "follow-up", "blocked", "unresolved"))
-            .GroupBy(r => string.IsNullOrWhiteSpace(r.Source.ProjectScope) ? "(none)" : r.Source.ProjectScope!, StringComparer.Ordinal)
+            .GroupBy(r => ScopeKey(r), StringComparer.Ordinal)
             .Where(static g => g.Count() >= 2);
 
         foreach (var cluster in unresolved)
@@ -219,12 +220,31 @@ public sealed class DefaultMemoryMaintenanceService(IMemoryConsolidator? consoli
         }
     }
 
+    /// <summary>The request with its records limited to its workspace and project scope. A record outside the scope is never grouped,
+    /// duplicated or acted on, so a shared store can be maintained for one workspace or project at a time.</summary>
+    private static MemoryMaintenanceRequest ScopeTo(MemoryMaintenanceRequest request)
+    {
+        if (request.Workspace is null && request.ProjectScope is null)
+            return request;
+
+        var records = request.Records
+            .Where(r => request.Workspace is null || string.Equals(r.Source.Workspace, request.Workspace, StringComparison.Ordinal))
+            .Where(r => request.ProjectScope is null || string.Equals(r.Source.ProjectScope, request.ProjectScope, StringComparison.Ordinal))
+            .ToList();
+        return request with { Records = records };
+    }
+
+    /// <summary>The workspace and project a record belongs to. Groups are keyed by it, so two workspaces with a project of the same
+    /// name are never combined.</summary>
+    private static string ScopeKey(MemoryRecord record) =>
+        (record.Source.Workspace ?? "(none)") + "/" + (record.Source.ProjectScope ?? "(none)");
+
     private static void AddClusterCollapseActions(MemoryMaintenanceRequest request, List<MemoryMaintenanceAction> actions, DateTimeOffset asOf)
     {
         var staleThreshold = asOf.AddDays(-45);
         var staleByProject = request.Records
             .Where(r => r.ObservedAtUtc <= staleThreshold)
-            .GroupBy(r => string.IsNullOrWhiteSpace(r.Source.ProjectScope) ? "(none)" : r.Source.ProjectScope!, StringComparer.Ordinal)
+            .GroupBy(r => ScopeKey(r), StringComparer.Ordinal)
             .Where(static g => g.Count() >= 3);
 
         foreach (var cluster in staleByProject)

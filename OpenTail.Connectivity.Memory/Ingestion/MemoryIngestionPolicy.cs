@@ -90,6 +90,32 @@ public sealed class DefaultMemoryIngestionPolicy : IMemoryIngestionPolicy
         @"\bbearer\s+[a-z0-9\-\._~\+/]+=*",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Values of kinds that are never stored. A match refuses the whole memory: scrubbing cannot be relied on to remove every
+    // occurrence of such a value, so no signal (not even an always-write one) overrides the refusal.
+    private static readonly Regex PrivateKeyBlockRegex = new(
+        @"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex LabelledPrivateKeyRegex = new(
+        @"\bprivate[ _-]?key\s*[:=]\s*\S+",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex SocialSecurityNumberRegex = new(
+        @"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b",
+        RegexOptions.Compiled);
+
+    private static readonly Regex CardNumberCandidateRegex = new(
+        @"\b(?:\d[ -]?){12,18}\d\b",
+        RegexOptions.Compiled);
+
+    private static readonly Regex ProviderCredentialRegex = new(
+        @"\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{36,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z\-_]{35})\b",
+        RegexOptions.Compiled);
+
+    private static readonly Regex JsonWebTokenRegex = new(
+        @"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
+        RegexOptions.Compiled);
+
     private static readonly string[] HighNoiseSignals =
     [
         "lorem ipsum",
@@ -121,6 +147,15 @@ public sealed class DefaultMemoryIngestionPolicy : IMemoryIngestionPolicy
         ArgumentNullException.ThrowIfNull(envelope);
         ArgumentNullException.ThrowIfNull(byDedupeKey);
         ArgumentNullException.ThrowIfNull(dedupeToRecordId);
+
+        // Never-stored values are refused first, before any signal is read, so no always-write signal can override them.
+        if (HoldsNeverStoredValue(envelope.Content ?? string.Empty) || HoldsNeverStoredValue(envelope.Summary ?? string.Empty))
+        {
+            return new MemoryIngestionDecision(
+                MemoryIngestionDecisionKind.Reject,
+                DedupeKey: envelope.DedupeKey,
+                Reason: "Write policy rejected memory holding a value that is never stored (private key, social security number, card number or provider credential).");
+        }
 
         var writeDecision = EvaluateWritePolicy(envelope);
         if (writeDecision is not null)
@@ -221,6 +256,45 @@ public sealed class DefaultMemoryIngestionPolicy : IMemoryIngestionPolicy
         }
 
         return null;
+    }
+
+    /// <summary>True when the text holds a value of a kind that is never stored: a private key, a social security number, a card number
+    /// that passes the Luhn check, a provider credential or a JSON Web Token. Pattern-based: it finds the formats it knows, not every secret.</summary>
+    internal static bool HoldsNeverStoredValue(string text)
+    {
+        if (text.Length == 0) return false;
+        if (PrivateKeyBlockRegex.IsMatch(text)
+            || LabelledPrivateKeyRegex.IsMatch(text)
+            || SocialSecurityNumberRegex.IsMatch(text)
+            || ProviderCredentialRegex.IsMatch(text)
+            || JsonWebTokenRegex.IsMatch(text))
+            return true;
+
+        foreach (Match candidate in CardNumberCandidateRegex.Matches(text))
+        {
+            var digits = new string(candidate.Value.Where(char.IsAsciiDigit).ToArray());
+            if (digits.Length is >= 13 and <= 19 && PassesLuhn(digits))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool PassesLuhn(string digits)
+    {
+        var sum = 0;
+        var doubled = false;
+        for (var i = digits.Length - 1; i >= 0; i--)
+        {
+            var digit = digits[i] - '0';
+            if (doubled)
+            {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+            doubled = !doubled;
+        }
+        return sum % 10 == 0;
     }
 
     private static bool IsSourceSelective(MemoryIngestionSourceType sourceType)

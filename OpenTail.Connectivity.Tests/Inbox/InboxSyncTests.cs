@@ -71,8 +71,8 @@ public sealed class GraphInboxSyncTests : IDisposable
         graph.Respond(u => u.Contains("skiptoken=2") ? Page(["c"], delta: Base + "?$deltatoken=D") : Page(["a", "b"], next: Base + "?$skiptoken=2"));
 
         Assert.Equal(["s a", "s b", "s c"], await Subjects(adapter, 10));
-        Assert.Equal(Base + "?$deltatoken=D", (await store.TryLoadAsync("me@example.com", "inbox"))!.DeltaLink);
-        Assert.Null(await store.TryLoadAsync("me@example.com")); // not under the old per-mailbox key
+        Assert.Equal(Base + "?$deltatoken=D", (await store.TryLoadAsync("t", "me@example.com", "inbox"))!.DeltaLink);
+        Assert.Null(await store.TryLoadAsync("other-tenant", "me@example.com", "inbox")); // another tenant's entry is not this one's
         Assert.All(graph.Requests, r => Assert.Equal("odata.maxpagesize=10", r.Prefer));
     }
 
@@ -83,21 +83,37 @@ public sealed class GraphInboxSyncTests : IDisposable
         graph.Respond(u => u.Contains("skiptoken=2") ? Page(["c", "d"], delta: Base + "?$deltatoken=D") : Page(["a", "b"], next: Base + "?$skiptoken=2"));
 
         Assert.Equal(["s a", "s b"], await Subjects(adapter, 2));
-        Assert.Equal(Base + "?$skiptoken=2", (await store.TryLoadAsync("me@example.com", "inbox"))!.DeltaLink);
+        Assert.Equal(Base + "?$skiptoken=2", (await store.TryLoadAsync("t", "me@example.com", "inbox"))!.DeltaLink);
 
         Assert.Equal(["s c", "s d"], await Subjects(adapter, 2));
-        Assert.Equal(Base + "?$deltatoken=D", (await store.TryLoadAsync("me@example.com", "inbox"))!.DeltaLink);
+        Assert.Equal(Base + "?$deltatoken=D", (await store.TryLoadAsync("t", "me@example.com", "inbox"))!.DeltaLink);
     }
 
     [Fact]
-    public async Task A_page_longer_than_asked_is_read_again_next_time_rather_than_cut()
+    public async Task A_page_longer_than_asked_is_emitted_whole_and_the_run_moves_past_it()
     {
         var (adapter, store, graph) = Create();
-        await store.SaveAsync(new GraphSyncState("me@example.com", Base + "?$deltatoken=OLD", DateTimeOffset.UtcNow, "inbox"));
         graph.Respond(_ => Page(["a", "b", "c"], delta: Base + "?$deltatoken=NEW")); // ignores the page size preference
 
-        Assert.Equal(["s a", "s b"], await Subjects(adapter, 2));
-        Assert.Equal(Base + "?$deltatoken=OLD", (await store.TryLoadAsync("me@example.com", "inbox"))!.DeltaLink);
+        Assert.Equal(["s a", "s b", "s c"], await Subjects(adapter, 2));
+        Assert.Equal(Base + "?$deltatoken=NEW", (await store.TryLoadAsync("t", "me@example.com", "inbox"))!.DeltaLink);
+    }
+
+    [Fact]
+    public async Task Two_runs_over_an_oversized_page_reach_the_next_batch()
+    {
+        var (first, store, graph) = Create();
+        graph.Respond(u => u.Contains("skiptoken=2") ? Page(["d"], delta: Base + "?$deltatoken=D") : Page(["a", "b", "c"], next: Base + "?$skiptoken=2"));
+
+        // The first page is longer than asked for and has no saved state yet: all of it is emitted, and the next link is saved after it.
+        Assert.Equal(["s a", "s b", "s c"], await Subjects(first, 2));
+        Assert.Equal(Base + "?$skiptoken=2", (await store.TryLoadAsync("t", "me@example.com", "inbox"))!.DeltaLink);
+
+        // The second run starts from that link, so it reaches the next batch instead of replaying the first.
+        var (second, _, again) = Create();
+        again.Respond(_ => Page(["d"], delta: Base + "?$deltatoken=D"));
+        Assert.Equal(["s d"], await Subjects(second, 2));
+        Assert.Contains("skiptoken=2", again.Requests[0].Url);
     }
 
     [Fact]
@@ -124,11 +140,11 @@ public sealed class GraphInboxSyncTests : IDisposable
         graph.Respond(_ => Page(["a"], delta: Base + "?$deltatoken=D"));
         await Subjects(adapter, 10);
         Assert.True(adapter.HasPendingSyncState);
-        Assert.Null(await store.TryLoadAsync("me@example.com", "inbox"));
+        Assert.Null(await store.TryLoadAsync("t", "me@example.com", "inbox"));
 
         await adapter.CommitSyncStateAsync();
         Assert.False(adapter.HasPendingSyncState);
-        Assert.Equal(Base + "?$deltatoken=D", (await store.TryLoadAsync("me@example.com", "inbox"))!.DeltaLink);
+        Assert.Equal(Base + "?$deltatoken=D", (await store.TryLoadAsync("t", "me@example.com", "inbox"))!.DeltaLink);
     }
 
     [Fact]
@@ -156,13 +172,15 @@ public sealed class GraphInboxSyncTests : IDisposable
     }
 
     [Fact]
-    public async Task State_saved_per_mailbox_before_folders_is_used_for_the_inbox()
+    public async Task State_saved_under_the_old_per_mailbox_key_is_not_read()
     {
-        var (adapter, store, graph) = Create();
-        await store.SaveAsync(new GraphSyncState("me@example.com", Base + "?$deltatoken=LEGACY", DateTimeOffset.UtcNow));
+        var (adapter, _, graph) = Create();
+        // The layout before the key included the tenant and the folder: one entry per mailbox address.
+        await File.WriteAllTextAsync(_stateFile,
+            """{ "me@example.com": { "UserEmail": "me@example.com", "DeltaLink": "https://graph.microsoft.com/v1.0/x?$deltatoken=LEGACY", "LastFetchAt": "2026-10-01T00:00:00Z" } }""");
         graph.Respond(_ => Page(["a"], delta: Base + "?$deltatoken=D"));
         await Subjects(adapter, 10);
-        Assert.Contains("deltatoken=LEGACY", graph.Requests[0].Url);
+        Assert.DoesNotContain("deltatoken=LEGACY", graph.Requests[0].Url);
     }
 
     internal sealed record SeenRequest(string Url, string? Prefer);

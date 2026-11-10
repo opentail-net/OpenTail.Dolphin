@@ -16,7 +16,7 @@ public sealed class GmailEmailSender : IEmailSender, IMailboxManager
     public async Task<string> SendAsync(OutboundEmail email, CancellationToken ct = default)
     {
         var credential = await BuildCredentialAsync(ct);
-        var service = new GmailService(new Google.Apis.Services.BaseClientService.Initializer
+        using var service = new GmailService(new Google.Apis.Services.BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
             ApplicationName = "OpenTail-Connectivity"
@@ -35,13 +35,13 @@ public sealed class GmailEmailSender : IEmailSender, IMailboxManager
 
     public async Task DeleteAsync(string messageId, CancellationToken ct = default)
     {
-        var svc = await BuildServiceAsync(ct);
+        using var svc = await BuildServiceAsync(ct);
         await svc.Users.Messages.Trash(messageId, "me").ExecuteAsync(ct);
     }
 
     public async Task MarkReadAsync(string messageId, bool isRead, CancellationToken ct = default)
     {
-        var svc = await BuildServiceAsync(ct);
+        using var svc = await BuildServiceAsync(ct);
         var req = new ModifyMessageRequest
         {
             AddLabelIds = isRead ? [] : ["UNREAD"],
@@ -52,7 +52,7 @@ public sealed class GmailEmailSender : IEmailSender, IMailboxManager
 
     public async Task MoveAsync(string messageId, string destinationFolder, CancellationToken ct = default)
     {
-        var svc = await BuildServiceAsync(ct);
+        using var svc = await BuildServiceAsync(ct);
         // Gmail uses labels not folders; destinationFolder is treated as a label to add.
         var req = new ModifyMessageRequest
         {

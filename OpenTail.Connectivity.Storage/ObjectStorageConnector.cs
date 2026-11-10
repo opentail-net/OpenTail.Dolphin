@@ -61,6 +61,10 @@ public sealed class ObjectStorageConnector : IIncrementalSourceConnector
         } while (resumeToken is not null);
     }
 
+    /// <summary>What a saved cursor is checked against: the file filter and whether cold storage is read. A change to either lists
+    /// everything again, so objects the old setting excluded are not missed behind the saved watermark.</summary>
+    private string StateFingerprint => FileFilter.Hash(_filter.Fingerprint, "cold=" + (_options.ReadColdStorage ? "1" : "0"));
+
     public async IAsyncEnumerable<SourceChange> GetChangesAsync(
         string? cursor,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -68,7 +72,7 @@ public sealed class ObjectStorageConnector : IIncrementalSourceConnector
         var state = ReadCursor(cursor);
         // A changed filter lists everything again: a widened one would otherwise miss unchanged objects behind the watermark.
         // A cursor from an earlier version has no filter, which gives one full listing.
-        if (state.Filter != _filter.Fingerprint) state = new Cursor(null, null, null, null);
+        if (state.Filter != StateFingerprint) state = new Cursor(null, null, null, null);
         var watermark = state.Watermark;
         var maxSeen = state.MaxSeen;
         var resumeToken = state.ResumeToken;
@@ -96,7 +100,7 @@ public sealed class ObjectStorageConnector : IIncrementalSourceConnector
                 bytesThisRun = SaturatingAdd(bytesThisRun, info.Size);
                 if (_options.MaxBytesPerRun is { } budget && bytesThisRun > budget)
                 {
-                    yield return new SourceChange.Checkpoint(WriteCursor(_filter.Fingerprint, new Cursor(watermark, maxSeen, pageResumeToken, info.Key)));
+                    yield return new SourceChange.Checkpoint(WriteCursor(StateFingerprint, new Cursor(watermark, maxSeen, pageResumeToken, info.Key)));
                     yield break;
                 }
             }
@@ -104,11 +108,11 @@ public sealed class ObjectStorageConnector : IIncrementalSourceConnector
             resumeToken = page.NextResumeToken;
             if (resumeToken is not null)
             {
-                yield return new SourceChange.Checkpoint(WriteCursor(_filter.Fingerprint, new Cursor(watermark, maxSeen, resumeToken, null)));
+                yield return new SourceChange.Checkpoint(WriteCursor(StateFingerprint, new Cursor(watermark, maxSeen, resumeToken, null)));
                 continue;
             }
 
-            yield return new SourceChange.Checkpoint(WriteCursor(_filter.Fingerprint, new Cursor(maxSeen, null, null, null)));
+            yield return new SourceChange.Checkpoint(WriteCursor(StateFingerprint, new Cursor(maxSeen, null, null, null)));
             yield break;
         }
     }

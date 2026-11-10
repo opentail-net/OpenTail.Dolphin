@@ -67,7 +67,7 @@ internal static class ImapMessageLookup
     internal static bool TryParseStableId(string id, ImapSettings account, out string folder, out uint uidValidity, out uint uid)
     {
         folder = string.Empty; uidValidity = 0; uid = 0;
-        var accountPrefix = $"{StableIdPrefix}{account.Username}@{account.Host}/";
+        var accountPrefix = $"{StableIdPrefix}{StableIdAccount(account)}/";
         if (!id.StartsWith(accountPrefix, StringComparison.Ordinal)) return false;
         var rest = id.AsSpan(accountPrefix.Length);
         var lastSlash = rest.LastIndexOf('/');
@@ -80,7 +80,15 @@ internal static class ImapMessageLookup
     }
 
     private static string StableIdBase(ImapSettings account, string folder, uint uidValidity)
-        => $"{StableIdPrefix}{account.Username}@{account.Host}/{folder}/{uidValidity}/";
+        => $"{StableIdPrefix}{StableIdAccount(account)}/{folder}/{uidValidity}/";
+
+    /// <summary>The account a state entry belongs to: username, host and port. Two accounts never share an entry.</summary>
+    internal static string Account(ImapSettings account) => $"{account.Username}@{account.Host}:{account.Port}";
+
+    /// <summary>The account part of a stable id. The standard ports (993 and 143) are left out, so ids made before the port was part of
+    /// the id stay the same; any other port is added, so two servers on one host never share an id.</summary>
+    private static string StableIdAccount(ImapSettings account) =>
+        account.Port is 993 or 143 ? $"{account.Username}@{account.Host}" : $"{account.Username}@{account.Host}:{account.Port}";
 
     internal static string Normalize(string messageId) => messageId.Trim().TrimStart('<').TrimEnd('>').Trim();
 }

@@ -27,7 +27,8 @@ public sealed class DropboxConnectorTests
 
         Assert.True(connector.ReportsDeletions);
         Assert.Equal(2, changes.OfType<SourceChange.Upsert>().Count());
-        Assert.Equal(["c1", "c2"], changes.OfType<SourceChange.Checkpoint>().Select(c => c.Cursor));
+        // Each saved cursor is the filter fingerprint, a colon, then Dropbox's own cursor.
+        Assert.Equal(["c1", "c2"], changes.OfType<SourceChange.Checkpoint>().Select(c => c.Cursor!.Split(':', 2)[1]));
         var item = Assert.IsType<SourceChange.Upsert>(changes[0]).Item;
         Assert.Equal("dropbox://dbid:acct-a//root/report.txt", item.Id);
         Assert.Equal("hash-1", item.Metadata![SourceKeys.Version]);
@@ -41,7 +42,8 @@ public sealed class DropboxConnectorTests
             """{"entries":[{".tag":"deleted","path_display":"/root/gone.txt"},{".tag":"file","path_display":"/root/changed.txt","size":80,"server_modified":"2026-10-02T10:00:00Z","content_hash":"hash-2"}],"cursor":"c2","has_more":false}"""));
         using var http = new HttpClient(handler);
         using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
-        var changes = await new DropboxConnector(client, "tenant", "dbid:acct-a").GetChangesAsync("saved-cursor").ToListAsync();
+        var connector = new DropboxConnector(client, "tenant", "dbid:acct-a");
+        var changes = await connector.GetChangesAsync(connector.CursorFingerprint + ":saved-cursor").ToListAsync();
 
         var deletion = Assert.IsType<SourceChange.Delete>(Assert.Single(changes.OfType<SourceChange.Delete>()));
         Assert.Equal("dropbox://dbid:acct-a//root/gone.txt", deletion.SourceRef);
@@ -60,12 +62,44 @@ public sealed class DropboxConnectorTests
         using var http = new HttpClient(handler);
         using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
 
-        var changes = await new DropboxConnector(client, "tenant", "dbid:acct-a").GetChangesAsync("expired").ToListAsync();
+        var connector = new DropboxConnector(client, "tenant", "dbid:acct-a");
+        var changes = await connector.GetChangesAsync(connector.CursorFingerprint + ":expired").ToListAsync();
 
         Assert.IsType<SourceChange.Reset>(changes[0]);
         Assert.Single(changes.OfType<SourceChange.Upsert>());
-        Assert.Equal("fresh", Assert.Single(changes.OfType<SourceChange.Checkpoint>()).Cursor);
+        Assert.Equal("fresh", Assert.Single(changes.OfType<SourceChange.Checkpoint>()).Cursor!.Split(':', 2)[1]);
         Assert.Equal("/2/files/list_folder", handler.Requests[1].Uri.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task A_cursor_saved_under_another_filter_resets_and_lists_the_folder_again()
+    {
+        var handler = new ApiHandler(_ => Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"c9\",\"has_more\":false}}"));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+        var narrow = new DropboxConnector(client, "tenant", "dbid:acct-a", new FileFilterOptions(MaxFileSizeBytes: 10));
+        var wide = new DropboxConnector(client, "tenant", "dbid:acct-a", new FileFilterOptions(MaxFileSizeBytes: 10_000));
+        var saved = Assert.Single((await narrow.GetChangesAsync(null).ToListAsync()).OfType<SourceChange.Checkpoint>()).Cursor;
+
+        // Widening the filter must not leave files it now admits behind the saved cursor: the folder is listed again from its start.
+        var changes = await wide.GetChangesAsync(saved).ToListAsync();
+
+        Assert.IsType<SourceChange.Reset>(changes[0]);
+        Assert.False(handler.Requests[1].Body.RootElement.TryGetProperty("cursor", out _));
+    }
+
+    [Fact]
+    public async Task A_cursor_saved_before_the_filter_fingerprint_existed_lists_the_folder_again()
+    {
+        var handler = new ApiHandler(_ => Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"c1\",\"has_more\":false}}"));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+
+        // A plain Dropbox cursor from an earlier version: nothing says which filter it was made under.
+        var changes = await new DropboxConnector(client, "tenant", "dbid:acct-a").GetChangesAsync("plain-old-cursor").ToListAsync();
+
+        Assert.IsType<SourceChange.Reset>(changes[0]);
+        Assert.False(handler.Requests[0].Body.RootElement.TryGetProperty("cursor", out _));
     }
 
     [Fact]

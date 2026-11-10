@@ -27,7 +27,8 @@ public sealed class GmailCalendarAdapter : ICalendarAdapter
     public async IAsyncEnumerable<CalendarInfo> ListCalendarsAsync(
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var svc = await BuildServiceAsync(ct);
+        using var lease = await LeaseAsync(ct);
+        var svc = lease.Service;
         var list = await svc.CalendarList.List().ExecuteAsync(ct);
         foreach (var cal in list?.Items ?? [])
             if (cal is not null)
@@ -41,7 +42,8 @@ public sealed class GmailCalendarAdapter : ICalendarAdapter
         if (options.MaxEvents <= 0)
             yield break;
 
-        var svc = await BuildServiceAsync(ct);
+        using var lease = await LeaseAsync(ct);
+        var svc = lease.Service;
         var calendarId = options.CalendarId ?? "primary";
 
         var request = svc.Events.List(calendarId);
@@ -72,7 +74,8 @@ public sealed class GmailCalendarAdapter : ICalendarAdapter
     public async Task<CalendarEvent?> GetEventAsync(
         string calendarId, string eventId, CancellationToken ct = default)
     {
-        var svc = await BuildServiceAsync(ct);
+        using var lease = await LeaseAsync(ct);
+        var svc = lease.Service;
         var ev = await svc.Events.Get(calendarId, eventId).ExecuteAsync(ct);
         if (ev is null) return null;
 
@@ -85,7 +88,8 @@ public sealed class GmailCalendarAdapter : ICalendarAdapter
     public async Task<string> CreateEventAsync(CalendarEvent draft, CancellationToken ct = default)
     {
         await _writePolicy.EnsureAllowedAsync(new(CalendarWriteKind.Create, draft.CalendarId, null, false), ct);
-        var svc = await BuildServiceAsync(ct);
+        using var lease = await LeaseAsync(ct);
+        var svc = lease.Service;
         var ev = ToGoogleEvent(draft);
         var created = await svc.Events
             .Insert(ev, draft.CalendarId)
@@ -101,7 +105,8 @@ public sealed class GmailCalendarAdapter : ICalendarAdapter
     public async Task UpdateEventAsync(CalendarEvent updated, CancellationToken ct = default)
     {
         await _writePolicy.EnsureAllowedAsync(new(CalendarWriteKind.Update, updated.CalendarId, updated.EventId, false), ct);
-        var svc = await BuildServiceAsync(ct);
+        using var lease = await LeaseAsync(ct);
+        var svc = lease.Service;
         await svc.Events
             .Patch(ToGoogleEvent(updated), updated.CalendarId, updated.EventId)
             .ExecuteAsync(ct);
@@ -111,7 +116,8 @@ public sealed class GmailCalendarAdapter : ICalendarAdapter
         string calendarId, string eventId, CancellationToken ct = default)
     {
         await _writePolicy.EnsureAllowedAsync(new(CalendarWriteKind.Delete, calendarId, eventId, false), ct);
-        var svc = await BuildServiceAsync(ct);
+        using var lease = await LeaseAsync(ct);
+        var svc = lease.Service;
         await svc.Events.Delete(calendarId, eventId).ExecuteAsync(ct);
     }
 
@@ -130,7 +136,8 @@ public sealed class GmailCalendarAdapter : ICalendarAdapter
         // Changing the user's attendee status is visible to the organiser.
         await _writePolicy.EnsureAllowedAsync(new(CalendarWriteKind.Respond, calendarId, eventId, true, responseStatus), ct);
 
-        var svc = await BuildServiceAsync(ct);
+        using var lease = await LeaseAsync(ct);
+        var svc = lease.Service;
         var ev = await svc.Events.Get(calendarId, eventId).ExecuteAsync(ct);
         if (ev?.Attendees is null) return;
 
@@ -144,6 +151,10 @@ public sealed class GmailCalendarAdapter : ICalendarAdapter
 
         await svc.Events.Update(ev, calendarId, eventId).ExecuteAsync(ct);
     }
+
+    /// <summary>The service for one operation: disposed with it, unless the caller supplied the service.</summary>
+    private async Task<ServiceLease<CalendarService>> LeaseAsync(CancellationToken ct) =>
+        new(await BuildServiceAsync(ct), owned: _service is null);
 
     private async Task<CalendarService> BuildServiceAsync(CancellationToken ct)
     {

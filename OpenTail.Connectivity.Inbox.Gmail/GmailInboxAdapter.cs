@@ -40,6 +40,8 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
         InboxFetchOptions options,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        // Refused before any request: only the system labels can be read (see GmailFolders).
+        var label = GmailFolders.LabelFor(options.Folder);
         using var service = ServiceForTests?.Invoke() ?? new GmailService(new BaseClientService.Initializer
         {
             HttpClientInitializer = await BuildCredentialAsync(cancellationToken),
@@ -47,7 +49,7 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
         });
 
         var savedState = _syncStore is not null
-            ? await _syncStore.TryLoadAsync(_settings.UserEmail, cancellationToken)
+            ? await _syncStore.TryLoadAsync(_settings.UserEmail, label, cancellationToken)
             : null;
 
         var startedAt = DateTimeOffset.UtcNow;
@@ -111,7 +113,7 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
                             getRequest.Format = UsersResource.MessagesResource.GetRequest.FormatEnum.Full;
                             var fullMsg = await getRequest.ExecuteAsync(cancellationToken);
 
-                            if (options.Folder != "INBOX" || (fullMsg.LabelIds != null && fullMsg.LabelIds.Contains("INBOX")))
+                            if (fullMsg.LabelIds != null && fullMsg.LabelIds.Contains(label))
                             {
                                 remaining--;
                                 yield return GmailMessageMapper.Map(fullMsg, _tenantContext, options.Folder);
@@ -150,7 +152,7 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
             if (backfill is null)
             {
                 // A first run: the newest MaxMessages (documented); older mail is not fetched.
-                await foreach (var msg in ListAsync(service, BuildQuery(options), options.Folder, remaining, new ListProgress(), cancellationToken))
+                await foreach (var msg in ListAsync(service, BuildQuery(options), label, remaining, new ListProgress(), cancellationToken))
                 {
                     remaining--;
                     yield return GmailMessageMapper.Map(msg, _tenantContext, options.Folder);
@@ -162,7 +164,7 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
         if (backfill is not null && !stoppedEarly && remaining > 0)
         {
             var progress = new ListProgress();
-            await foreach (var msg in ListAsync(service, backfill.Query, options.Folder, remaining, progress, cancellationToken))
+            await foreach (var msg in ListAsync(service, backfill.Query, label, remaining, progress, cancellationToken))
             {
                 remaining--;
                 yield return GmailMessageMapper.Map(msg, _tenantContext, options.Folder);
@@ -181,7 +183,8 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
                 HistoryId: historyId,
                 LastFetchAt: DateTimeOffset.UtcNow,
                 CoveredUntil: coveredUntil,
-                Backfill: backfill);
+                Backfill: backfill,
+                Folder: label);
             if (_commit == InboxSyncCommit.AfterEnumeration) await CommitSyncStateAsync(cancellationToken);
         }
     }
@@ -200,7 +203,7 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
     }
 
     /// <summary>Messages matching <paramref name="query"/>, newest first, at most <paramref name="max"/>.</summary>
-    private static async IAsyncEnumerable<Message> ListAsync(GmailService service, string? query, string folder, int max, ListProgress progress,
+    private static async IAsyncEnumerable<Message> ListAsync(GmailService service, string? query, string label, int max, ListProgress progress,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         string? pageToken = null;
@@ -211,7 +214,7 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
             listRequest.Q = query;
             listRequest.MaxResults = Math.Min(max - taken, GmailMaxPageSize);
             listRequest.PageToken = pageToken;
-            listRequest.LabelIds = folder == "INBOX" ? new[] { "INBOX" } : null;
+            listRequest.LabelIds = new[] { label };
 
             var listResponse = await listRequest.ExecuteAsync(cancellationToken);
             var refs = listResponse.Messages ?? [];

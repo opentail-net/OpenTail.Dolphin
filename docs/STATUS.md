@@ -131,15 +131,15 @@ The consumer contract is **stable and implemented**. Downstream stores can rely 
 |-----------|---------|--------|--------------|-------------|-----------|----------------|
 | S3 | `Storage.S3` | ✅ Implemented | Tested | No | No | No |
 | Azure Blob | `Storage.AzureBlob` | ⚠️ In progress | Not yet tested | No | No | No |
-| SFTP | N/A | ❌ Planned | N/A | N/A | N/A | N/A |
-| Dropbox | N/A | ❌ Planned | N/A | N/A | N/A | N/A |
+| SFTP | `Storage.Sftp` | ⚠️ In progress | Unit-tested, not live | No | No | No |
+| Dropbox | `Storage.Dropbox` | ⚠️ In progress | Unit-tested, not live | No | No | No |
 
-### Cloud Drives (Planned)
+### Cloud Drives
 
 | Connector | Package | Status | Design | Notes |
 |-----------|---------|--------|--------|-------|
-| Microsoft Graph files | `Drive.Graph` | ❌ Planned | Designed | Delta API, version tokens, permissions |
-| Google Drive | `Drive.Google` | ❌ Planned | Designed | Changes API, version tokens, permissions |
+| Microsoft Graph files | `Drive.Graph` | ⚠️ In progress | Designed | Delta API, version tokens, permissions. Unit-tested, not live |
+| Google Drive | `Drive.Google` | ⚠️ In progress | Designed | Changes API, version tokens, permissions. Unit-tested, not live |
 
 ### SaaS Systems (Future)
 

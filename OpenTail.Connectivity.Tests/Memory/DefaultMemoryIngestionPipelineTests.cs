@@ -834,6 +834,34 @@ public class DefaultMemoryIngestionPipelineTests
     }
 
     [Fact]
+    public async Task IngestAsync_NeverStoredValue_PersistsNothing()
+    {
+        var capture = new MemoryRawCaptureEnvelope(
+            EnvelopeId: "env-never-1",
+            SourceType: MemoryIngestionSourceType.GitHub,
+            SourceSystem: "github",
+            EventKind: MemoryIngestionEventKind.PullRequest,
+            ExternalId: "pr-never-1",
+            CapturedAtUtc: DateTimeOffset.Parse("2026-05-14T11:00:00Z"),
+            ObservedAtUtc: DateTimeOffset.Parse("2026-05-14T11:00:00Z"),
+            RawPayload: "Decision approved; incident resolved. Customer SSN: 123-45-6789",
+            DedupeKey: "github:pr-never-1",
+            ContentHash: "hash-never-1");
+
+        var store = new RecordingStore();
+        var pipeline = new DefaultMemoryIngestionPipeline(
+            normalizer: new PassThroughNormalizer(),
+            policy: new DefaultMemoryIngestionPolicy(),
+            registry: new InMemoryIngestionRegistry(),
+            store: store);
+
+        await pipeline.IngestAsync(capture);
+
+        // The decision is a refusal, so nothing reaches the store: not the original text and not a scrubbed copy.
+        Assert.Null(store.LastEnvelope);
+    }
+
+    [Fact]
     public async Task IngestAsync_ScrubAndAccept_ReplacesSensitiveContentBeforeStore()
     {
         var capture = new MemoryRawCaptureEnvelope(

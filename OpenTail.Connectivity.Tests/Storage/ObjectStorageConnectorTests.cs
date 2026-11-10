@@ -51,6 +51,23 @@ public sealed class ObjectStorageConnectorTests
     }
 
     [Fact]
+    public async Task Reading_cold_storage_after_it_was_off_lists_the_cold_objects_again()
+    {
+        var watermark = DateTimeOffset.Parse("2026-10-01T12:00:00Z");
+        var client = new InMemoryObjectStoreClient("bucket")
+            .Put("docs/anchor.txt", "a", watermark)
+            .Put("docs/cold.txt", Encoding.UTF8.GetBytes("cold"), watermark.AddHours(-2), costsExtraToRead: true);
+        var warm = new ObjectStorageConnector(client, "tenant", new ObjectStorageOptions(Prefix: "docs/"));
+        var cursor = (await CollectAsync(warm.GetChangesAsync(null))).OfType<SourceChange.Checkpoint>().Last().Cursor;
+
+        // The cold object is older than the saved watermark, so only a fresh listing can offer it once cold storage is read.
+        var cold = new ObjectStorageConnector(client, "tenant", new ObjectStorageOptions(Prefix: "docs/", ReadColdStorage: true));
+        var changes = await CollectAsync(cold.GetChangesAsync(cursor));
+
+        Assert.Contains("cold.txt", changes.OfType<SourceChange.Upsert>().Select(c => c.Item.DisplayName));
+    }
+
+    [Fact]
     public async Task A_widened_filter_lists_everything_again_so_an_old_object_it_now_takes_is_read()
     {
         var old = DateTimeOffset.Parse("2020-01-01T00:00:00Z");

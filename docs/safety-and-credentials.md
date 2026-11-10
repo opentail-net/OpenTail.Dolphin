@@ -116,4 +116,8 @@ other's data.
 `SiteCrawlConnector` honours `robots.txt` (`RespectRobotsTxt`, default on), only follows links on the start host, and can be limited with
 `AllowedPathPrefixes` (whole path segments), `MaxPages`, `MaxDepth` and `RequestDelay`. Only crawl sites you have the right to crawl.
 The same-origin check is complete only with a client that does not follow redirects itself (`CreateHttpClient`, or
-`SiteCrawlConnector.Create(handler, ...)`); start URLs are trusted configuration, with no private-address blocking.
+`SiteCrawlConnector.Create(handler, ...)`); a handler you supply is refused if it follows redirects or already has its own connect callback.
+
+Addresses are checked too. Private, loopback, link-local and similar addresses are refused by default, including the start URL's
+address; `WebCrawlOptions.AllowPrivateNetworks` allows them. The check runs on the address actually connected to, after DNS, so a name
+that changes address between the check and the connection cannot reach an internal service.

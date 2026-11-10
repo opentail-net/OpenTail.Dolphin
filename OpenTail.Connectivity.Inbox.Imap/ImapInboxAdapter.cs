@@ -50,19 +50,20 @@ public sealed class ImapInboxAdapter : IInboxAdapter, IInboxSyncCommit
             await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
 
             var savedState = _syncStore is not null
-                ? await _syncStore.TryLoadAsync(options.Folder, cancellationToken)
+                ? await _syncStore.TryLoadAsync(ImapMessageLookup.Account(_settings), options.Folder, cancellationToken)
                 : null;
 
             var query = BuildQuery(options, savedState, folder);
             var uids = await folder.SearchAsync(query, cancellationToken);
 
-            var incremental = savedState is not null && savedState.UidValidity == folder.UidValidity && savedState.HighestSeenUid > 0;
+            var incremental = IsIncremental(savedState, folder.UidValidity);
             var toFetch = SelectUids(uids, options.MaxMessages, incremental);
 
             var fetchRequest = new FetchRequest(MessageSummaryItems.UniqueId | MessageSummaryItems.Envelope | MessageSummaryItems.BodyStructure);
             var summaries = await folder.FetchAsync(toFetch, fetchRequest, cancellationToken);
 
-            uint highestSeenUid = savedState?.HighestSeenUid ?? 0;
+            // After a UIDVALIDITY change the saved UIDs name other messages: the count starts again from the new numbering.
+            uint highestSeenUid = StartingHighestSeenUid(savedState, folder.UidValidity);
 
             foreach (var summary in summaries)
             {
@@ -82,7 +83,8 @@ public sealed class ImapInboxAdapter : IInboxAdapter, IInboxSyncCommit
                     Folder: options.Folder,
                     UidValidity: folder.UidValidity,
                     HighestSeenUid: highestSeenUid,
-                    UpdatedAt: DateTimeOffset.UtcNow);
+                    UpdatedAt: DateTimeOffset.UtcNow,
+                    Account: ImapMessageLookup.Account(_settings));
                 if (_commit == InboxSyncCommit.AfterEnumeration) await CommitSyncStateAsync(cancellationToken);
             }
         }
@@ -115,10 +117,20 @@ public sealed class ImapInboxAdapter : IInboxAdapter, IInboxSyncCommit
         return selected;
     }
 
+    /// <summary>True when the saved state still describes this folder's numbering: same UIDVALIDITY, and a highest UID seen.
+    /// Only then can the run continue above the saved UID.</summary>
+    internal static bool IsIncremental(ImapSyncState? savedState, uint uidValidity) =>
+        savedState is not null && savedState.UidValidity == uidValidity && savedState.HighestSeenUid > 0;
+
+    /// <summary>The highest UID seen before this run: the saved one when the run is incremental, otherwise zero. A saved UID from
+    /// before a UIDVALIDITY change must never be carried over, or new messages below it would be skipped.</summary>
+    internal static uint StartingHighestSeenUid(ImapSyncState? savedState, uint uidValidity) =>
+        IsIncremental(savedState, uidValidity) ? savedState!.HighestSeenUid : 0;
+
     private static SearchQuery BuildQuery(InboxFetchOptions options, ImapSyncState? savedState, IMailFolder folder)
     {
-        if (savedState is not null && savedState.UidValidity == folder.UidValidity && savedState.HighestSeenUid > 0)
-            return SearchQuery.Uids(new UniqueIdRange(new UniqueId(savedState.HighestSeenUid + 1), UniqueId.MaxValue));
+        if (IsIncremental(savedState, folder.UidValidity))
+            return SearchQuery.Uids(new UniqueIdRange(new UniqueId(savedState!.HighestSeenUid + 1), UniqueId.MaxValue));
 
         if (options.Since.HasValue)
             return SearchQuery.DeliveredAfter(options.Since.Value.UtcDateTime);

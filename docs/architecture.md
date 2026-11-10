@@ -138,8 +138,9 @@ they include code that can change a mailbox or calendar. What can write, and wha
   library calls it; call it yourself, for example in a test.
 - `IEmailSender` (send) and `IMailboxManager` (delete, mark read, move) are separate, and both are gated by `EmailSenderPolicy`:
   sending is off by default and needs human approval by default; mailbox changes are off by default.
-- `ICalendarAdapter` includes create, update, delete and respond. The Graph and Gmail adapters implement them for real, with
-  **no policy gate**; the ICS adapter throws `NotSupportedException`.
+- `ICalendarAdapter` includes create, update, delete and respond. The Graph and Gmail adapters implement them for real, behind
+  `CalendarWritePolicy`, which allows no write by default (read-only until a deployment opts in); the ICS adapter throws
+  `NotSupportedException`.
 
 ## Tenant context
 
