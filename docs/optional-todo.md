@@ -36,3 +36,7 @@ From the [queue research](design/queue-research-2026-10-22.md).
   storage and per-collection caching first. *When:* a local deployment outgrows exact search (see
   [SQLite vectors](design/sqlite-vectors.md#scale-honestly)).
 
+
+## Ideas from other ingestion projects (2026-11-13)
+
+[Ingestion ideas, November 2026](design/ingestion-ideas-2026-11.md): twelve ideas from Airbyte, unstructured, LlamaIndex and a short search, each with what Dolphin has today and what to check first. Suggested first: failure kinds (A2) and a connection check (A1). Nothing is built.

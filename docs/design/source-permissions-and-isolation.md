@@ -104,6 +104,12 @@ The index/search owner must enforce the policy, not just store ACL metadata:
    context.
 4. Keep any trusted-corpus path explicit and separate from the per-user authorization path.
 5. Test revocation, cross-tenant access, group membership changes, stale ACLs and failure behavior end to end.
+6. Added 2026-11-13 (from [ingestion ideas](ingestion-ideas-2026-11.md#d2-two-more-tests-for-the-permissions-plan)): run a
+   **paired-persona probe**, the same query as a user who may read the document and as one who may not, and require that the
+   second gets nothing from it. And require that **a cached answer does not outlive a revoked permission**: any cache of results
+   or answers is keyed by the caller and dropped, or checked again, when the ACL it relied on changes or goes stale.
+7. A re-sync must never drop or flatten an ACL. A document whose permissions could not be re-read keeps "uncaptured", which
+   denies; it never falls back to open.
 
 **Release gate:** do not describe shared indexing as permission-aware until these checks run in the real consumer path and the
 provider capture has passed its completeness tests.
