@@ -3,8 +3,8 @@
 Small .NET libraries that read content from where it lives: folders, web pages, CSV, email files, SQL databases, inboxes (IMAP,
 Microsoft Graph, Gmail), calendars (ICS feeds, Outlook, Google) and social platforms. They normalise it into documents with text and metadata. Source connectors only read; the Graph, Gmail and IMAP
 packages also contain email-sending and (Graph, Gmail) calendar-editing code, see [safety and credentials](docs/safety-and-credentials.md). They depend only on
-public NuGet packages. They are licensed under proprietary commercial licence: noncommercial use only; commercial use needs a
-licence (see [Licence](#licence)).
+public NuGet packages. They are under a proprietary commercial licence: any use needs a signed commercial licence agreement with OpenTail
+(see [Licence](#licence)).
 
 They are used by the OpenTail Host's modules and by OpenTail itself.
 
@@ -114,3 +114,5 @@ authenticate with `GITHUB_TOKEN`, or use a secret holding such a token.
 ## Licence
 
 Proprietary and commercial. All rights reserved. Any use needs a signed commercial licence agreement with OpenTail; see [LICENSE.md](LICENSE.md).
+
+Code released before 20 October 2026 under the MIT licence stays under that licence for those who received it.
