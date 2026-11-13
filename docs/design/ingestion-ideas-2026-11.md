@@ -265,14 +265,46 @@ deny, bound the age of a captured ACL. Two test ideas were not in it and have be
 rule that a cached answer must not outlive a revoked permission. A third point is a warning for connector authors: a re-sync must
 never drop or flatten an ACL, because that turns a restricted document open.
 
-## 6. Suggested order
+## 6. The plan
 
-1. **A2, then A1.** Small, and they change what an operator sees when a credential breaks. A1 uses A2's kinds.
-2. **A3 with the REST helper**, when the helper is built.
-3. **D1's deterministic step and B2**, measured with the quality gate.
-4. **B4**, with the attachment work.
-5. **C3** as a table in the memory design.
-6. **B1** only after checking what the extraction library provides, and only with a need.
+Nothing is started. In order, with the corrections of section 9 applied. Tick a box when the work is merged.
+
+**First: what an operator sees when a credential breaks**
+
+- [ ] **A2. Failure kinds.**
+  - [ ] `SourceConfigurationException` in `Files`.
+  - [ ] The pipeline stops the run on it, in the fetch branch and from the change stream; nothing goes on the retry list.
+  - [ ] `IngestionReport` says the run stopped on a configuration failure.
+  - [ ] Each connector that sees a 401 or 403 throws it.
+  - [ ] Pass the error text to `TrackRetry` directly.
+  - [ ] Tests: a revoked credential stops the run and leaves the cursor and the retry list as they were.
+- [ ] **B4. Type mismatch in the main pipeline** (goes with A2).
+  - [ ] A warnings list on `TextExtractionResult`; `TransformationsTextExtractor` passes the library's warnings through.
+  - [ ] The pipeline records a mismatch as a validation warning.
+- [ ] **A1. Connection check.**
+  - [ ] `IConnectionCheck` and `ConnectionCheckResult`, using A2's kinds.
+  - [ ] Implement on the connectors that take a credential (owner question 1).
+  - [ ] A conformance check.
+  - [ ] Orca calls it from `--lint` and at startup (Orca's repository).
+
+**Then: retrieval quality, each measured with the quality gate before it is turned on**
+
+- [ ] Make the default chunk limit (480 characters) an option.
+- [ ] **B2. Tables** in `DefaultMemoryIngestionChunker`: recognise a table, cut on rows, repeat the header, tag the pieces.
+- [ ] **D1, step 1.** Title and summary in front of the indexed text. Needs an optional index-text field on `MemoryChunk`.
+- [ ] **D1, step 2.** The `IChunkContextualizer` hook (owner question 2).
+- [ ] **C3.** One rule in the embedder's contract: embed content and index text, never metadata.
+
+**With other work**
+
+- [ ] **A3. Call budget**, in the REST helper's design when the helper is built (shared groundwork 5).
+- [ ] **C2.** State the cache rule once, for every step that calls a model.
+
+**Only with a need**
+
+- [ ] **A4.** A change count on `Checkpoint` (a public contract change).
+- [ ] **A5.** An early estimate.
+- [ ] **B1. Typed elements.** First ask what the extraction library can return (owner question 3).
 
 ## 7. Open questions for the owner
 
@@ -316,5 +348,4 @@ in full, `TransformationsTextExtractor` in full, `HierarchicalChunker` in full, 
 - The default chunk limit, 480 characters, is a constant. Retrieval work (B2, D1) will want to measure other sizes with the
   quality gate, which needs it to be an option first.
 
-**Order, revised.** A2, then A1. Then B2 in the default chunker and D1's title step, both measured. B4 is now a small
-pass-through and can go with A2.
+**Order, revised.** Section 6 has it as a checkbox plan.
