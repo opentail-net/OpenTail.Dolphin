@@ -1,24 +1,24 @@
 # Notes for the Host
 
-**Status:** notes. **The code they concern is in [`opentail-net/opentail-host`](https://github.com/opentail-net/opentail-host),
+**Status:** notes. **The code they concern is in [`opentail-net/OpenTail.Orca`](https://github.com/opentail-net/OpenTail.Orca),
 not in this repository.** They came out of the Connectivity design work and are kept here so the coder can see them next to it.
-Written from reading `opentail-host` at `3dd97bb`; line numbers will drift. The larger Sql module plan has its own page:
+Written from reading `OpenTail.Orca` at `3dd97bb`; line numbers will drift. The larger Sql module plan has its own page:
 [sql-postgres-mysql.md](sql-postgres-mysql.md).
 
-## Where these need fixing (opentail-host)
+## Where these need fixing (OpenTail.Orca)
 
 | Note | File | Where |
 |---|---|---|
 | 1. IMAP mail older than 30 days is invisible | `OpenTail.Modules.Email/EmailModule.cs` | The two `FetchRecentAsync` calls (lines 65 and 75) pass no `Since`. |
 | 2. Files module reads text only | `OpenTail.Modules.Files/FilesModule.cs` | The read path decodes bytes as UTF-8 (around line 102). |
 | 3. A `storage` module for buckets | New module | See [object storage](../design/object-storage.md#live-tools-in-the-host). |
-| 4. Microsoft 365 files as a profile | `profiles/`, `OpenTail.Host/PROFILES.md` | New profile. |
+| 4. Microsoft 365 files as a profile | `profiles/`, `OpenTail.Orca/PROFILES.md` | New profile. |
 | 5. Breaking changes from Connectivity | `Directory.Packages.props` (the `OpenTail.Connectivity.*` pins, version 0.1.0) | Email, Calendar, Microsoft365, Google, Email.Imap, Calendar.Ics and Web modules. |
 | 6. Wikis | `profiles/`, a new module | A Confluence profile; Notion as a module; SharePoint pages in the Microsoft 365 work. See the [roadmap](../roadmap.md#wikis). |
-| 7. The query builder | `OpenTail.Modules.OpenApi` | The deferred query builder (`OpenTail.Host/PROFILES.md`, "Deferred"), needed for Jira, Zendesk and Freshdesk profiles. |
-| 8. Slack | `OpenTail.Host.Notifications`, a future Slack read profile | Keep the approval/notification app and any history-reading app separate. |
-| 9. Roles and permissions | Tool descriptors, API key and token roles, `PolicyConfig` | See [roles and permissions](https://github.com/opentail-net/opentail-host/blob/main/docs/design/roles-and-permissions.md). |
-| 10. `skills.publish` | `OpenTail.Modules.Skills`, `ActionQueue.cs` | Three [questions to resolve](https://github.com/opentail-net/opentail-host/blob/main/docs/design/skills-publish-questions.md): report trust, label race, reviewer edits. |
+| 7. The query builder | `OpenTail.Modules.OpenApi` | The deferred query builder (`OpenTail.Orca/PROFILES.md`, "Deferred"), needed for Jira, Zendesk and Freshdesk profiles. |
+| 8. Slack | `OpenTail.Orca.Notifications`, a future Slack read profile | Keep the approval/notification app and any history-reading app separate. |
+| 9. Roles and permissions | Tool descriptors, API key and token roles, `PolicyConfig` | See [roles and permissions](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/roles-and-permissions.md). |
+| 10. `skills.publish` | `OpenTail.Modules.Skills`, `ActionQueue.cs` | Three [questions to resolve](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/skills-publish-questions.md): report trust, label race, reviewer edits. |
 
 ## 1. IMAP mail older than 30 days is invisible
 
@@ -96,7 +96,7 @@ module already does with its filters instead of a raw encoded query.
 
 ## 8. Slack
 
-Slack appears in the Host twice: as a notification and approval channel (`OpenTail.Host.Notifications`, and the Slack buttons in
+Slack appears in the Host twice: as a notification and approval channel (`OpenTail.Orca.Notifications`, and the Slack buttons in
 the V5 plan), and possibly later as data the AI reads. Keep these as **two Slack apps**. The approval app needs to post messages
 and receive button clicks; it should not hold `channels:history`, `groups:history` or `search:read`. A reading app, if one is
 added, gets only the read scopes, in the channels it is invited to, and searching needs a user token (as the person asking).
@@ -106,12 +106,12 @@ reasons Slack data is read live rather than indexed: Slack's API terms and histo
 ## 9. Roles and permissions
 
 Every caller with the tools role sees every advertised tool, and policy rules cannot test who is asking, so a production agent
-can call `skills.publish`. The [roles and permissions](https://github.com/opentail-net/opentail-host/blob/main/docs/design/roles-and-permissions.md) design separates business agents
+can call `skills.publish`. The [roles and permissions](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/roles-and-permissions.md) design separates business agents
 from administration agents (the workbench, the AI tuner), puts each tool in a plane, and adds `Callers` to policy entries.
 
 ## 10. `skills.publish`
 
 Three questions, written up with options and a recommendation each in
-[skills.publish: questions to resolve](https://github.com/opentail-net/opentail-host/blob/main/docs/design/skills-publish-questions.md): whether the report in the change request can be trusted
+[skills.publish: questions to resolve](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/skills-publish-questions.md): whether the report in the change request can be trusted
 (it is free text from the caller today), what an approval applies to when the label moved after review (today it can roll
 production back unintentionally), and what happens when a reviewer edits the arguments (the preview is not rebuilt).

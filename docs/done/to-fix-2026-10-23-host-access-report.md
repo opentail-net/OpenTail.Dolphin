@@ -4,9 +4,9 @@ I found one more concrete bug in the Host. Beyond this, I don’t have another n
 
 Severity: P2 — audit and access-review accuracy
 
-In [`AccessChanges.Report`](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host/Runtime/AccessChanges.cs?utm_source=chatgpt.com#L143-L152), the report reconstructs identities above `Normal` from the audit trail. It handles automatic `level_changed` events and `level_cleared` events, but it does not handle `level_suspended` events.
+In [`AccessChanges.Report`](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Host/Runtime/AccessChanges.cs?utm_source=chatgpt.com#L143-L152), the report reconstructs identities above `Normal` from the audit trail. It handles automatic `level_changed` events and `level_cleared` events, but it does not handle `level_suspended` events.
 
-The manual suspension path in [`IdentityLevels.SuspendAsync`](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host/Runtime/IdentityLevels.cs?utm_source=chatgpt.com#L168-L177) emits exactly that event.
+The manual suspension path in [`IdentityLevels.SuspendAsync`](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Host/Runtime/IdentityLevels.cs?utm_source=chatgpt.com#L168-L177) emits exactly that event.
 
 The result: an identity manually suspended by an operator may be absent from the historical access report altogether. If it had previously been automatically elevated, the report can instead show that older level, understating its actual suspension.
 

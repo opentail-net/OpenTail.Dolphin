@@ -3,9 +3,9 @@
 **Status:** proposal. Nothing here is implemented. Sketches are illustrations, not formats to copy yet.
 
 **Where it fits:** mostly a new, separate component (a **workbench**), plus a few small pieces in
-[`opentail-host`](https://github.com/opentail-net/opentail-host). It is not Connectivity code. It is kept here with the other
+[`OpenTail.Orca`](https://github.com/opentail-net/OpenTail.Orca). It is not Connectivity code. It is kept here with the other
 designs so the coder can see it next to them. Written from reading the Host at `71838b4`, including its
-[v6 plan](https://github.com/opentail-net/opentail-host/blob/main/docs/MCP-HOST-V6-PLAN.md) for AI reviewers, which this design
+[v6 plan](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/MCP-HOST-V6-PLAN.md) for AI reviewers, which this design
 builds on rather than repeats.
 
 ## The idea

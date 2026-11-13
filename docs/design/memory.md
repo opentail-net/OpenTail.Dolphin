@@ -322,7 +322,7 @@ For the owner:
    harmless-looking records ("invoices from Acme go to account X" is not sensitive), so a sensitivity threshold lets the attack
    through. Rules: an agent write to a private scope runs; to a shared scope it queues for review; a **tainted** write to a
    shared scope always queues and cannot be relaxed. An untainted shared write can be relaxed per scope with the Host's existing
-   [undo window](https://github.com/opentail-net/opentail-host/blob/main/docs/design/undo-window.md) rules and trust ramp
+   [undo window](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/undo-window.md) rules and trust ramp
    (recallable only after the window closes).
 4. **Host tool surface.** Mirror the MCP reference server's names, implement Claude's memory-tool commands, or both on one
    store? *Decided 2026-10-19 with the owner: neither as the contract. Design for how models will work, not for today's tool

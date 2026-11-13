@@ -22,7 +22,7 @@ Fix: Don’t let a parse failure silently look like successful discovery. Either
 
 ## 3. P2/P3 — The Host’s guarded HTTP client still has a DNS-address fallback gap
 
-The separate Host implementation, [`GuardedHttp.cs`](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host/Modules/GuardedHttp.cs?utm_source=chatgpt.com#L58-L75), resolves all addresses for a host but attempts to connect only to the first one.
+The separate Host implementation, [`GuardedHttp.cs`](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Host/Modules/GuardedHttp.cs?utm_source=chatgpt.com#L58-L75), resolves all addresses for a host but attempts to connect only to the first one.
 
 If that address is unreachable while a later resolved address is reachable, the request fails unnecessarily. This is the same class of reliability defect that came up in the Connectivity web client, but it is a separate implementation, so fixing one does not fix the other.
 

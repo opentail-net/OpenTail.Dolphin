@@ -67,9 +67,9 @@ They are used by the OpenTail Host's modules and by OpenTail itself.
     [tickets, wikis and chat](docs/design/tickets-wikis-and-chat.md), [CRM](docs/design/crm.md),
     [finance systems](docs/design/finance.md), [triggers](docs/design/triggers.md) (the *when*).
 - [Using and writing connectors](docs/writing-a-connector.md): a worked example and the contracts to implement.
-- [Host Sql module: Postgres and MySQL](docs/host/sql-postgres-mysql.md): a plan for code in `opentail-host`, including a
+- [Host Sql module: Postgres and MySQL](docs/host/sql-postgres-mysql.md): a plan for code in `OpenTail.Orca`, including a
   security fix, kept here with the other SQL design work.
-- [Notes for the Host](docs/host/notes.md): smaller items for `opentail-host` found during this work (IMAP lookback, text
+- [Notes for the Host](docs/host/notes.md): smaller items for `OpenTail.Orca` found during this work (IMAP lookback, text
   extraction in the Files module, a `storage` module, a Microsoft 365 files profile, coordinating breaking changes).
 - [skills.publish: questions to resolve](docs/host/skills-publish-questions.md): whether the change request's report can be
   trusted, what an approval applies to, and reviewer edits.

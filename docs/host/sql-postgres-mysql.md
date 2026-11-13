@@ -1,24 +1,24 @@
 # Plan: Postgres and MySQL in the Host's Sql module
 
-**Status:** plan. **The code it concerns is in [`opentail-net/opentail-host`](https://github.com/opentail-net/opentail-host),
+**Status:** plan. **The code it concerns is in [`opentail-net/OpenTail.Orca`](https://github.com/opentail-net/OpenTail.Orca),
 not in this repository.** It is kept here because this is where the SQL design work happened; the coder can see both. Written
 from reading `OpenTail.Modules.Sql` at commit `3dd97bb`. Nothing has been run against a real Postgres or MySQL server. Item 1
 was checked with a line-for-line port of `SqlGuard.Tokenise`; whether the database then runs the hidden statement is still to be
 confirmed (step 1.5).
 
-## Where this needs fixing (opentail-host)
+## Where this needs fixing (OpenTail.Orca)
 
 | Item | File | Where |
 |---|---|---|
 | 1.1 Guard misses Postgres and MySQL quoting **(security)** | `OpenTail.Modules.Sql/SqlGuard.cs` | `Tokenise` (line 65) and `Skip` (line 103): only `'`, `"`, `[ ]`, `` ` ``, `--` and `/* */` are known (lines 78-95). `Classify` needs the dialect. |
 | 1.2 One login for reads and writes **(security)** | `OpenTail.Modules.Sql/SqlModuleFactory.cs`, `SqlModule.cs` | `OpenAsync` in `CreateAsync` (factory lines 75-88) builds the only connection; `SqlModuleOptions` has one `ConnectionFactory`/`ConnectionFactoryAsync` (module lines 10-13), used by every tool. |
 | 1.3 No read-only transaction for queries | `OpenTail.Modules.Sql/SqlModule.cs` | `QueryAsync` (line 94); read-only is set only for SQLite (factory line 83). |
-| 1.5 Tests for the bypasses | `OpenTail.Host.Tests/MoreModuleTests.cs` | `SqlGuardTests.Refuses` (around line 106). |
+| 1.5 Tests for the bypasses | `OpenTail.Orca.Tests/MoreModuleTests.cs` | `SqlGuardTests.Refuses` (around line 106). |
 | 2 Schema tool | `SqlModule.cs`, `SqlModuleFactory.cs` | `InformationSchemaQuery` (module line 41), its use in the factory (line 101), and `SchemaAsync` using `MaxRows` (module line 88). |
 | 3 MySQL previews write for real | `SqlModule.cs` | `WritePreview.PreviewAsync`, the rollback preview (from line 218). |
 | 4 Values | `SqlModule.cs` | `Cell` (line 182) and the per-cell read in `ReadAsync` (line 176). |
-| 5 Docs | `OpenTail.Host/MODULES.md`, `OpenTail.Host/SECURITY.md` | The `sql` row in `MODULES.md` (around line 117). |
-| 6 Tests on real servers | `OpenTail.Host.Tests/MoreModuleTests.cs` | `SqlModuleTests` (from line 130) is SQLite-only. |
+| 5 Docs | `OpenTail.Orca/MODULES.md`, `OpenTail.Orca/SECURITY.md` | The `sql` row in `MODULES.md` (around line 117). |
+| 6 Tests on real servers | `OpenTail.Orca.Tests/MoreModuleTests.cs` | `SqlModuleTests` (from line 130) is SQLite-only. |
 
 Line numbers are from `3dd97bb` and will drift.
 
@@ -138,7 +138,7 @@ Plan:
 ## 7. Packaging
 
 The Host does not reference the drivers; a deployment does. Document the driver versions the tests ran against, and that the
-deployment's own vulnerability audit covers them. A sample deployment (like `OpenTail.Host.Sample.*`) with Postgres would show the
+deployment's own vulnerability audit covers them. A sample deployment (like `OpenTail.Orca.Sample.*`) with Postgres would show the
 whole setup.
 
 ## Order

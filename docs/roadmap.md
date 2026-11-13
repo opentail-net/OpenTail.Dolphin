@@ -22,7 +22,7 @@ data changes quickly, and their permissions are hard to copy faithfully. Live to
 description. The [CRM](design/crm.md), [finance](design/finance.md) and [tickets, wikis and chat](design/tickets-wikis-and-chat.md)
 designs stay as background, for the day any of that content needs indexing. Wikis are the exception: see [wikis](#wikis).
 
-**Ticketing in the Host today** (as of `opentail-host` `3dd97bb`):
+**Ticketing in the Host today** (as of `OpenTail.Orca` `3dd97bb`):
 - **GitHub Issues** and **ServiceNow** are done, as hand-written Host modules (`github-issues`, `servicenow`). Both work on
   allow-listed scopes (repositories; tables and writable fields), put writes through review, and avoid duplicate writes after
   a crash. ServiceNow is a module rather than a profile because its writes need a lookup first.

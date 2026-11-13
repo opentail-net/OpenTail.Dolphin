@@ -1,7 +1,7 @@
 # Design: reading email attachments through the Host
 
 **Status:** slices 1–3 built in `opentail-connectivity` (2026-10-24, not released); slice 4 (Host) and 5 (live checks) not built. Written 2026-10-23 from a first draft (`docs/email-attachments-processing-plan.md`, now replaced by this
-file), after reading the code it touches in `opentail-connectivity`, `opentail-host` and `Transformations.Text`. Every claim about
+file), after reading the code it touches in `opentail-connectivity`, `OpenTail.Orca` and `Transformations.Text`. Every claim about
 existing code below was checked against the code on 2026-10-23; vendor facts are split into checked and to-verify at the end.
 Revised the same day for `Transformations.Text` **2.0.5.1** (published on nuget.org, source read): processing now uses its
 AI-ingestion profile and `GetModelInput`, and its own timeout and cancellation replace the abandoned-thread workaround. Revised
@@ -31,7 +31,7 @@ The pieces exist but do not connect, and two of them are wrong.
 | Gmail attachment id | `GmailMessageMapper.cs:118-131` | Only parts with a filename **and** `Body.AttachmentId`; `SizeBytes` from `Body.Size`. |
 | Graph attachment metadata | `GraphInboxAdapter.cs:109-110`, `GraphThreadFetcher.cs:29-31` | `attachments` is in `$select`. It is a relationship of `message`; whether `$select` fills it or `$expand` is needed is **to verify** (below). If not, `Attachments` is empty today for every Graph message. |
 | `ImapMessageLookup.StableId` | `Inbox.Imap` | `imap-uid:{user}@{host}/{folder}/{uidvalidity}/{uid}`, and `FindExactAsync` already accepts it. A ready-made IMAP provider reference. |
-| Host `email.read` | `opentail-host/OpenTail.Modules.Email/EmailModule.cs` | Scans the newest `ReadSearchWindow` (200) messages for `MessageId` equal to the argument; returns `attachments = m.AttachmentNames` (names only). Result carries `untrusted = true` and a notice. |
+| Host `email.read` | `OpenTail.Orca/OpenTail.Modules.Email/EmailModule.cs` | Scans the newest `ReadSearchWindow` (200) messages for `MessageId` equal to the argument; returns `attachments = m.AttachmentNames` (names only). Result carries `untrusted = true` and a notice. |
 | Host taint | `ToolDescriptor.ReadsUntrusted` | Calling a tool with this flag taints the session (`PolicyResolver.cs:107`); `email.list_recent` and `email.read` set it. |
 | Host deferred construction | `Modules.Email/Deferred.cs` | `DeferredInbox`, `DeferredSender`: built per call so secrets are read late. Used by the IMAP, Google and Microsoft 365 factories. |
 | Text extraction | `Files/Extraction/TransformationsTextExtractor.cs` | Wraps `Transformations.Text` **2.0.3**: `GetTextWithMetadata(fileName, content)`, no options; keeps only `ErrorMessage`. |

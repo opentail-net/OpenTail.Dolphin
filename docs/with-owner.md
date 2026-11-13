@@ -33,7 +33,7 @@ Each turns something labelled Tested into Verified against the real service.
 - [ ] **Host work items on `IWorkQueue`:** not moved (2026-10-22); work items are records that are read by id, listed and claimed
   with filters, and a queue cannot do that. The reasoning and two alternatives (queue the Host's webhook deliveries and
   external-wait polling now; a "delivery hint" queue when the Host goes multi-node) are in the Host's
-  [work design](https://github.com/opentail-net/opentail-host/blob/main/docs/design/work-and-continuations.md). *Plan section 21.*
+  [work design](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/work-and-continuations.md). *Plan section 21.*
 
 ## Open design questions
 

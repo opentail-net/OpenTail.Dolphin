@@ -203,6 +203,6 @@ before include.
   `IInboxAdapter`, `IEmailSender` and `ICalendarAdapter` (and its tests implement `IInboxAdapter`), so a split must be made
   together with the Host.
 
-Answered: the Host does not rely on random document IDs. As of `opentail-host` `3dd97bb` it uses the inbox and calendar
+Answered: the Host does not rely on random document IDs. As of `OpenTail.Orca` `3dd97bb` it uses the inbox and calendar
 adapters, the email senders and `HtmlTextExtractor`, but not the pipeline, `SourceItem`, `NormalisedDocument` or the exporters, so
 changes to those (sections 1 to 4) do not reach it.

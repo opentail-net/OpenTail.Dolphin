@@ -10,7 +10,7 @@ decision; sections whose items are all done are only there. Ideas nothing needs 
 Each item names the repository it touches and links the page that explains it:
 
 - **[C]** this repository, `opentail-connectivity`.
-- **[H]** [`opentail-host`](https://github.com/opentail-net/opentail-host).
+- **[H]** [`OpenTail.Orca`](https://github.com/opentail-net/OpenTail.Orca).
 - **[O]** [`opentail`](https://github.com/opentail-net/opentail), the developer product that uses this repository.
 - **[Owner]** a decision or a task for the product owner, not code. Listed in full in [with-owner.md](with-owner.md); the plan keeps
   a one-line pointer where the item belongs.
@@ -49,16 +49,16 @@ Live search and reading, nothing copied. [Roadmap: three tiers](roadmap.md#docum
   [roadmap](roadmap.md#two-ways-to-use-business-data) (nothing stored, cached or indexed).
 
 - [ ] **[H]** Snowflake as a read-only Sql target with cost guards (warehouse checks, per-call limits, a daily budget per identity)
-  ([Snowflake](https://github.com/opentail-net/opentail-host/blob/main/docs/design/snowflake.md), steps S1 to S5). *Owner,
+  ([Snowflake](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/snowflake.md), steps S1 to S5). *Owner,
   2026-10-23: no project needs a warehouse yet, and when one does it may be the customer's; build the capability anyway and prove
   it on an official test account. S1 and S2 built 2026-10-23 (Tested, not Verified); S5 needs a Snowflake trial account (owner).*
 - [x] **[H]** More Sql targets (owner, 2026-10-23, the quick wins from a top-10 list): Fabric and Synapse through `sqlserver`
-  ([guide](https://github.com/opentail-net/opentail-host/blob/main/docs/guides/fabric-synapse.md), docs only), `redshift` through
+  ([guide](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/guides/fabric-synapse.md), docs only), `redshift` through
   Npgsql, and `oracle` in its own package `OpenTail.Modules.Sql.Oracle` with a CI suite on Oracle Database Free. Providers are now
   `SqlProvider` records; add-on packages declare their own. *Built 2026-10-23. Fabric, Synapse and Redshift wait on real accounts.*
 - [x] **[H]** Databricks: `OpenTail.Modules.Sql.Databricks`, an ADO.NET adapter over the SQL Statement Execution API through the
   Host's guarded HTTP client (OAuth service principal or token, `:name` parameters, LIMIT, query tags, cancel on timeout)
-  ([guide](https://github.com/opentail-net/opentail-host/blob/main/docs/guides/databricks.md)). *Built against a stub 2026-10-23.*
+  ([guide](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/guides/databricks.md)). *Built against a stub 2026-10-23.*
 - [ ] **[Owner]** A Databricks workspace: [with-owner.md](with-owner.md#accounts-and-test-systems)
 
 ## 5. Ask the first customers
@@ -112,7 +112,7 @@ the owner to weigh later. On 2026-10-17 the owner asked for implementation to st
 
 ## 12. Roles and permissions
 
-[Roles and permissions](https://github.com/opentail-net/opentail-host/blob/main/docs/design/roles-and-permissions.md) (in the Host repository): agent profiles bound to the credential, plus an
+[Roles and permissions](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/roles-and-permissions.md) (in the Host repository): agent profiles bound to the credential, plus an
 `Administers` flag, so the agents that do the business's work cannot administer how it is done. **Building next.**
 
 *Decided by the owner on 2026-10-18:* keys without a profile get a startup warning, then are refused one release later; one
@@ -126,7 +126,7 @@ needs one approval for `staging` and two for `production`.
 
 ## 13. Adaptive limits and intrusion detection
 
-[Adaptive limits](https://github.com/opentail-net/opentail-host/blob/main/docs/design/adaptive-limits.md): measure what each request touched, total it per identity, and tighten in steps
+[Adaptive limits](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/adaptive-limits.md): measure what each request touched, total it per identity, and tighten in steps
 (slow down, then queue, then deny only on strong evidence); only a person loosens. **The groundwork is second in line, after
 profiles:** baselines need weeks of history, so the metrics must be recorded before the feature exists.
 
@@ -146,7 +146,7 @@ requires rotating the key; entity keys stored as salted hashes; daily summaries 
 
 ## 14. Where data goes
 
-[Where data goes](https://github.com/opentail-net/opentail-host/blob/main/docs/design/data-flow.md): the other half of taint. Label data where it enters, carry the labels on the session, and
+[Where data goes](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/data-flow.md): the other half of taint. Label data where it enters, carry the labels on the session, and
 check outbound calls against flow rules. Waits for sections 12 and 13.
 
 *Decided by the owner on 2026-10-18:* five fixed labels (`finance`, `personal`, `hr`, `customer`, `secret`) plus labels
@@ -156,7 +156,7 @@ operators define; the label window reuses `TaintWindow`.
 
 ## 15. Execute with an undo window
 
-[Undo window](https://github.com/opentail-net/opentail-host/blob/main/docs/design/undo-window.md): the action is announced, runs after a set time unless someone presses Stop, and is audited
+[Undo window](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/undo-window.md): the action is announced, runs after a set time unless someone presses Stop, and is audited
 either way. Taint still forces Queue. Waits for sections 12 and 13. *Corrected 2026-10-18: it is a `DelayFor` on `Execute`,
 not a new `ToolMode` value; `ToolMode` is ordered by its numbers and frozen at contract version 1.*
 
@@ -167,7 +167,7 @@ delay to working hours is an opt-in per tool.
 
 ## 17. Work items and continuations
 
-[Work items and continuations](https://github.com/opentail-net/opentail-host/blob/main/docs/design/work-and-continuations.md): an
+[Work items and continuations](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/work-and-continuations.md): an
 inbox of work for agents (delegated tasks, a fresh context per run, a thread note between runs), and parking an agent's place while
 it waits for an approval or an external check, resumed with the outcomes. The Host keeps the ledger and never becomes a harness.
 Builds on sections 12 to 16.
@@ -178,19 +178,19 @@ the Host stores the note, carrying its session's taint and labels.
 - [ ] **[Owner]** Work items' open questions: [with-owner.md](with-owner.md#open-design-questions)
 - [ ] **[H]** External waits: callback route and polling, against one real check.
 - [ ] **[H]** MCP Tasks extension (SEP-2663) for actions and waited-on items.
-  [Design](https://github.com/opentail-net/opentail-host/blob/main/docs/design/mcp-tasks.md) written 2026-10-18. It needs the C#
+  [Design](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/mcp-tasks.md) written 2026-10-18. It needs the C#
   MCP SDK upgraded from 1.4.1 to 2.x first (Tasks exist only on the 2026-07-28 protocol revision); the part for queued and delayed
   actions does not wait for work items. *SDK upgraded to 2.2.0 on 2026-10-18 (owner's go-ahead); old 2025-11-25 clients still
   served.* *Step 2, tasks for queued and delayed actions, built 2026-10-18 (built, unverified: the SDK's client only, no real
   client).* *Step 3, long-running calls as tasks, built 2026-10-18 (inline limit 20 s, provisional).* Step 4 (push, delegation,
   `input_required`) waits on the SDK's `subscriptions/listen` and per-user sign-in. Open: inline limit; poll intervals (60 s and 2 s
   used, provisional).
-- [ ] **[Deferred]** [Slack as a front door for work](https://github.com/opentail-net/opentail-host/blob/main/docs/design/slack-front-door.md):
+- [ ] **[Deferred]** [Slack as a front door for work](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/slack-front-door.md):
   not now (owner, 2026-10-18). Revisit when a Slack-based customer asks, work items exist and per-user sign-in is in place.
 
 ## 18. Audit and evidence
 
-[Audit and evidence](https://github.com/opentail-net/opentail-host/blob/main/docs/design/audit-and-evidence.md): what a customer's
+[Audit and evidence](https://github.com/opentail-net/OpenTail.Orca/blob/main/docs/design/audit-and-evidence.md): what a customer's
 auditor will ask (what happened, how it was decided, who decided, under which rules, can the record be trusted) and the records
 that answer it, mapped to SOC 2, ISO/IEC 27001, NIST SP 800-53 (AU), the EU AI Act, ISO/IEC 42001 and GDPR. Completes the
 tamper-evident audit trail of section 16. Written 2026-10-18 at the owner's request.
@@ -203,7 +203,7 @@ tamper-evident audit trail of section 16. Written 2026-10-18 at the owner's requ
 
 ## 19. Operating procedures and the gaps they found
 
-[SOP.md](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host/SOP.md): what the Host does by itself and what
+[SOP.md](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Orca/SOP.md): what the Host does by itself and what
 people do, step by step, for operators, reviewers, security, integration and credential owners and auditor liaisons: three
 walkthroughs (a call, a work item, a failure) and procedures for operations, reviewing, inspections, failures, changes, security
 incidents, audit and personal-data requests. Written 2026-10-18 at the owner's request; every step points at a real command or
@@ -290,7 +290,7 @@ boundaries; 3 Gmail, Mbox and DNS; 4 Host execution safeguards; 5 Host access re
 code and held, and all were fixed 2026-10-23; three related gaps were found while checking (marked *found*). They fall into three classes, so each class also gets a test that
 covers every implementation, not just the ones named.
 
-*Host items built 2026-10-23 (opentail-host 6081d5b). Connectivity items built 2026-10-23 with regression tests (commits 5f802ff, 7343b69, 51bc841, c0de9b1 and the namespace commit).
+*Host items built 2026-10-23 (OpenTail.Orca 6081d5b). Connectivity items built 2026-10-23 with regression tests (commits 5f802ff, 7343b69, 51bc841, c0de9b1 and the namespace commit).
 Found while fixing: Gmail saved the profile's history id read after listing, so mail arriving in between was skipped (fixed with
 3.1). Meta's discovery already threw, so it was never part of 1.8. Breaking for stored state: SFTP and Box root containers now
 name the account, so their item ids change once.*

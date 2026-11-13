@@ -2,7 +2,7 @@ Yes. This pass turned up two more substantive Host issues that I haven’t cover
 
 ## 1. P1/P2 — Suspending an identity doesn’t stop its automatic retries or recovery
 
-Sources: [`ActionExecutor.cs`](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host/Runtime/ActionExecutor.cs?utm_source=chatgpt.com#L174-L215) and [`ActionExecutor.cs`](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host/Runtime/ActionExecutor.cs?utm_source=chatgpt.com#L229-L260).
+Sources: [`ActionExecutor.cs`](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Host/Runtime/ActionExecutor.cs?utm_source=chatgpt.com#L174-L215) and [`ActionExecutor.cs`](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Host/Runtime/ActionExecutor.cs?utm_source=chatgpt.com#L229-L260).
 
 The Host lets an operator suspend an identity, with the stated intent that the identity can no longer perform actions. The submission and approval paths check suspension, but the execution recovery paths do not make the same check.
 
@@ -17,7 +17,7 @@ Fix: Recheck enforced suspension immediately before invoking a tool, including d
 
 ## 2. P2 — An edited action can execute with a preview that describes different arguments
 
-Sources: [`ActionQueue.cs`](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host/Runtime/ActionQueue.cs?utm_source=chatgpt.com#L220-L260), [`ActionQueue.cs`](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host/Runtime/ActionQueue.cs?utm_source=chatgpt.com#L385-L404), and [`ActionRecord.cs`](https://github.com/opentail-net/opentail-host/blob/main/OpenTail.Host.Abstractions/Actions/ActionRecord.cs?utm_source=chatgpt.com#L105-L170).
+Sources: [`ActionQueue.cs`](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Host/Runtime/ActionQueue.cs?utm_source=chatgpt.com#L220-L260), [`ActionQueue.cs`](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Host/Runtime/ActionQueue.cs?utm_source=chatgpt.com#L385-L404), and [`ActionRecord.cs`](https://github.com/opentail-net/OpenTail.Orca/blob/main/OpenTail.Host.Abstractions/Actions/ActionRecord.cs?utm_source=chatgpt.com#L105-L170).
 
 The Host generates a preview when an action is submitted. During review, a reviewer can supply replacement arguments, and `EffectiveArgumentsJson` causes those edited arguments to be used for execution.
 
