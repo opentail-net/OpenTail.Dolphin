@@ -18,7 +18,7 @@
     <PackageProjectUrl>https://github.com/opentail-net/OpenTail.Dolphin</PackageProjectUrl>
     <RepositoryUrl>https://github.com/opentail-net/OpenTail.Dolphin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <!-- proprietary commercial licence (LICENSE.md): a written commercial licence from OpenTail is needed for any use. -->
+    <!-- proprietary commercial licence (LICENSE.md): a signed commercial licence agreement with OpenTail is needed for any use. -->
     <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageTags Condition="'$(PackageTags)'==''">opentail;connectivity;connectors</PackageTags>

@@ -113,4 +113,4 @@ authenticate with `GITHUB_TOKEN`, or use a secret holding such a token.
 
 ## Licence
 
-Proprietary and commercial. Use, copying, modification and distribution need a written commercial licence from OpenTail; see [LICENSE.md](LICENSE.md).
+Proprietary and commercial. All rights reserved. Any use needs a signed commercial licence agreement with OpenTail; see [LICENSE.md](LICENSE.md).
