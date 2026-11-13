@@ -12,6 +12,19 @@ Each idea says what Dolphin has today, what would be added, and what must be che
 | unstructured | `7d81b40e` | Apache-2.0 | `unstructured/documents/elements.py`, and the option and metadata names in `unstructured/chunking/base.py`, `chunking/title.py` and `file_utils/filetype.py` |
 | LlamaIndex | `e3c425ccc` | MIT | `llama-index-core/llama_index/core/ingestion/pipeline.py` and `schema.py` |
 
+> **Rule for anyone building an Airbyte-derived idea (A1 to A5): do not open Airbyte's source code.**
+> Airbyte is under the Elastic License 2.0, which is not an open-source licence. We may use only the ideas it has shared publicly
+> in its documentation. So, for a person or an AI agent implementing A1 to A5:
+> - Do **not** read, search, copy from or paraphrase Airbyte's code: not the local copy under `examples/airbyte`, not GitHub, not
+>   a package, not a snippet quoted somewhere else. That covers its CDK, its connectors, its manifests and its tests.
+> - Do **not** copy text from its documentation either. Cite it and write our own words.
+> - Build from this document and from Dolphin's own contracts. If this document is not enough, read Airbyte's **published
+>   documentation** only (the two pages named in the table above), or ask the owner.
+> - If you have already seen the relevant Airbyte code, say so before you start, so the owner can give the work to someone else.
+>
+> This document was written under the same rule: only the two documentation pages were read, through `git show`, and no source file
+> was opened.
+
 **Limits.** I read the files named, not the projects. I ran nothing. The three are Python or JVM projects, so everything here is a
 design idea to rebuild in .NET, not something to port.
 
@@ -49,6 +62,9 @@ ingestion pipeline and retriever. Ideas that depend on them are marked *check fi
 | D2 | Two more permission tests | Search | Source permissions plan | Small | Medium; added to that plan |
 
 ## 3. The ideas
+
+**A1 to A5 come from Airbyte's documentation. Do not look at Airbyte's source code when building them** (the rule at the top of
+this document).
 
 ### A1. A connection check (Airbyte)
 

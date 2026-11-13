@@ -23,6 +23,9 @@ The packages Dolphin depends on are a separate matter: their licences travel wit
 - Source: https://github.com/airbytehq/airbyte
 - Licence: Elastic License 2.0 in the repository's root `LICENSE`, as read on 2026-11-13. Only its documentation was read.
 - Copyright, as stated in its `LICENSE_SHORT`: Copyright (c) 2026 Airbyte, Inc.
+- **Rule: nobody working on Dolphin, person or AI agent, opens Airbyte's source code.** Only the ideas in its published
+  documentation may be used, in our own words. No code, configuration, test or documentation text is copied or paraphrased from it.
+  The full rule is at the top of `docs/design/ingestion-ideas-2026-11.md`.
 - Used for: `docs/design/ingestion-ideas-2026-11.md`. The connection check as a separate operation, the three failure types, the
   record count carried with a state message, the early estimate, and the API budget corrected from response headers. Airbyte's protocol
   document itself credits the Singer specification as its starting point.
