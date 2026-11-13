@@ -1,6 +1,6 @@
 # MongoDB reader
 
-`OpenTail.Connectivity.MongoDb` gives governed, read-only access to a MongoDB database: one allowed collection per query, every
+`OpenTail.Dolphin.MongoDb` gives governed, read-only access to a MongoDB database: one allowed collection per query, every
 query checked against an operator allow-list, every operation with a server-side time limit and an optional comment, and every
 result bounded. It is built for agents asking questions of document data. The design and its three reviews are in
 [design/redis-pinecone-mongodb.md](design/redis-pinecone-mongodb.md).

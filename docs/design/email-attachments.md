@@ -1,7 +1,7 @@
 # Design: reading email attachments through the Host
 
-**Status:** slices 1–3 built in `opentail-connectivity` (2026-10-24, not released); slice 4 (Host) and 5 (live checks) not built. Written 2026-10-23 from a first draft (`docs/email-attachments-processing-plan.md`, now replaced by this
-file), after reading the code it touches in `opentail-connectivity`, `OpenTail.Orca` and `Transformations.Text`. Every claim about
+**Status:** slices 1–3 built in `OpenTail.Dolphin` (2026-10-24, not released); slice 4 (Host) and 5 (live checks) not built. Written 2026-10-23 from a first draft (`docs/email-attachments-processing-plan.md`, now replaced by this
+file), after reading the code it touches in `OpenTail.Dolphin`, `OpenTail.Orca` and `Transformations.Text`. Every claim about
 existing code below was checked against the code on 2026-10-23; vendor facts are split into checked and to-verify at the end.
 Revised the same day for `Transformations.Text` **2.0.5.1** (published on nuget.org, source read): processing now uses its
 AI-ingestion profile and `GetModelInput`, and its own timeout and cancellation replace the abandoned-thread workaround. Revised
@@ -119,7 +119,7 @@ transfer encoding (base64 × 3/4) and the fetcher counts the real bytes. Graph l
 
 ### 3. Processing
 
-A new `AttachmentProcessor` in `OpenTail.Connectivity.Files/Extraction/`:
+A new `AttachmentProcessor` in `OpenTail.Dolphin.Files/Extraction/`:
 
 ```csharp
 public sealed record AttachmentProcessingOptions(

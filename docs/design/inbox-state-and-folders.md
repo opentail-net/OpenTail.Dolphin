@@ -1,8 +1,8 @@
 # Design: inbox sync state, Gmail folders and account identity
 
-**Status:** implemented 2026-11-09, uncommitted. The owner agreed decisions 1 to 3 the same day. Decisions 4 to 6 were recommended by Claude and built; the owner confirmed them on 2026-11-10 (quarantine of unparseable files, failing the run on I/O errors and on a lock held over 5 seconds, and the account and tenant in the state key). Written from reading `opentail-connectivity` at `e617634`. Source: the external review of 2026-11-09 (issues 1 to 5), with two further findings from reading the code (marked "found while reading"). Vendor facts were checked in Google's Gmail API reference on 2026-11-09; Graph delta behaviour is not relied on by this design.
+**Status:** implemented 2026-11-09, uncommitted. The owner agreed decisions 1 to 3 the same day. Decisions 4 to 6 were recommended by Claude and built; the owner confirmed them on 2026-11-10 (quarantine of unparseable files, failing the run on I/O errors and on a lock held over 5 seconds, and the account and tenant in the state key). Written from reading `OpenTail.Dolphin` at `e617634`. Source: the external review of 2026-11-09 (issues 1 to 5), with two further findings from reading the code (marked "found while reading"). Vendor facts were checked in Google's Gmail API reference on 2026-11-09; Graph delta behaviour is not relied on by this design.
 
-**Where it fits:** the three inbox adapters and their state stores (`OpenTail.Connectivity.Inbox.Graph`, `.Gmail`, `.Imap`), a shared state-file helper in `OpenTail.Connectivity.Files`, and the docs. The core `FileSyncCursorStore` is not changed (see "Not in this design").
+**Where it fits:** the three inbox adapters and their state stores (`OpenTail.Dolphin.Inbox.Graph`, `.Gmail`, `.Imap`), a shared state-file helper in `OpenTail.Dolphin.Files`, and the docs. The core `FileSyncCursorStore` is not changed (see "Not in this design").
 
 ## The problems
 
@@ -126,10 +126,10 @@ Recommended, for the owner to confirm:
 
 **Changed:**
 
-- `OpenTail.Connectivity.Files/LockedJsonState.cs` (new): the shared state file, read and changed under one lock. The lock file is deleted on release.
-- `OpenTail.Connectivity.Inbox.Graph`: `GraphSyncState` gains the tenant and is keyed by tenant, mailbox and folder. `GraphInboxAdapter` emits a whole oversized page, saves the next link after it, and no longer reads the old per-mailbox key.
-- `OpenTail.Connectivity.Inbox.Gmail`: `GmailFolders.cs` (new) maps the five system labels and refuses other folders before any request. `GmailSyncState` gains a label; INBOX keeps its key (the address), other labels add the label. `GmailInboxAdapter` filters the listing and the history by the folder's label.
-- `OpenTail.Connectivity.Inbox.Imap`: `ImapSyncState` gains the account and is keyed by account and folder. `ImapMessageLookup` adds the port to the stable id for ports other than 993 and 143.
+- `OpenTail.Dolphin.Files/LockedJsonState.cs` (new): the shared state file, read and changed under one lock. The lock file is deleted on release.
+- `OpenTail.Dolphin.Inbox.Graph`: `GraphSyncState` gains the tenant and is keyed by tenant, mailbox and folder. `GraphInboxAdapter` emits a whole oversized page, saves the next link after it, and no longer reads the old per-mailbox key.
+- `OpenTail.Dolphin.Inbox.Gmail`: `GmailFolders.cs` (new) maps the five system labels and refuses other folders before any request. `GmailSyncState` gains a label; INBOX keeps its key (the address), other labels add the label. `GmailInboxAdapter` filters the listing and the history by the folder's label.
+- `OpenTail.Dolphin.Inbox.Imap`: `ImapSyncState` gains the account and is keyed by account and folder. `ImapMessageLookup` adds the port to the stable id for ports other than 993 and 143.
 - Tests: `InboxSyncTests.cs` (the pagination test rewritten as a two-run test; the legacy-key test now asserts the old key is not read), `GmailSyncTests.cs` (fake extended with labels and history records; 4 new tests), `ImapSyncStateTests.cs` (rewritten; 3 new tests), `AtomicFileTests.cs`, new `InboxStateStoreTests.cs` (5 tests) and `ImapAccountIdentityTests.cs` (6 test cases).
 - Docs: `safety-and-credentials.md` (the crawler's private-address check is described as it is), `architecture.md` (calendar writes are behind `CalendarWritePolicy`), `STATUS.md` (SFTP, Dropbox and both Drive connectors are "in progress, unit-tested, not live").
 

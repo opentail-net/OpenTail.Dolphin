@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>OpenTail Dolphin — read-only Gmail inbox adapter using the Gmail API. Verification: Tested.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Calendar.v3" />
+    <PackageReference Include="Google.Apis.Gmail.v1" />
+    <PackageReference Include="Google.Apis.Auth" />
+    <InternalsVisibleTo Include="OpenTail.Dolphin.Tests" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Files\OpenTail.Dolphin.Files.csproj" />
+  </ItemGroup>
+</Project>

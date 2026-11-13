@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UseMicrosoftTestingPlatform>true</UseMicrosoftTestingPlatform>
+    <NoWarn>$(NoWarn);xUnit1051;xUnit1031</NoWarn>
+    <Description>Unit tests for the OpenTail Dolphin Core projects.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="MimeKit" />
+    <!-- The SQLite native library (the Sql package brings it too). -->
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.InMemory" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Files\OpenTail.Dolphin.Files.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Queues\OpenTail.Dolphin.Queues.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Queues.Sqlite\OpenTail.Dolphin.Queues.Sqlite.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.MongoDb\OpenTail.Dolphin.MongoDb.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Web\OpenTail.Dolphin.Web.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Sql\OpenTail.Dolphin.Sql.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Email\OpenTail.Dolphin.Email.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Inbox.Imap\OpenTail.Dolphin.Inbox.Imap.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Inbox.Gmail\OpenTail.Dolphin.Inbox.Gmail.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Drive.Google\OpenTail.Dolphin.Drive.Google.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Drive.Graph\OpenTail.Dolphin.Drive.Graph.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Inbox.Graph\OpenTail.Dolphin.Inbox.Graph.csproj" />
+
+    <ProjectReference Include="..\OpenTail.Dolphin.Csv\OpenTail.Dolphin.Csv.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Calendar.Ics\OpenTail.Dolphin.Calendar.Ics.csproj" />
+
+    <ProjectReference Include="..\OpenTail.Dolphin.Social\OpenTail.Dolphin.Social.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.RichText\OpenTail.Dolphin.RichText.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Memory\OpenTail.Dolphin.Memory.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Memory.Sqlite\OpenTail.Dolphin.Memory.Sqlite.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Memory.VectorData\OpenTail.Dolphin.Memory.VectorData.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Storage\OpenTail.Dolphin.Storage.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Storage.S3\OpenTail.Dolphin.Storage.S3.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Storage.AzureBlob\OpenTail.Dolphin.Storage.AzureBlob.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Storage.Sftp\OpenTail.Dolphin.Storage.Sftp.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Storage.Dropbox\OpenTail.Dolphin.Storage.Dropbox.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Storage.Gcs\OpenTail.Dolphin.Storage.Gcs.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Storage.WebDav\OpenTail.Dolphin.Storage.WebDav.csproj" />
+    <ProjectReference Include="..\OpenTail.Dolphin.Storage.Box\OpenTail.Dolphin.Storage.Box.csproj" />
+  </ItemGroup>
+</Project>

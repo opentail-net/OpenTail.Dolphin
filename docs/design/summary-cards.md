@@ -265,7 +265,7 @@ A summary reveals what a document says, not just that it exists, so cards are st
 
 | Piece | Where |
 |---|---|
-| `SummaryCard` and related records, `IDocumentSummariser`, `ICardStore`, `IFetchGate`, `IRunObserver`, `SummaryCardExporter`, `JsonCardStore` | This repository, in `Files` or a small `OpenTail.Connectivity.Cards` package (no new dependency either way). |
+| `SummaryCard` and related records, `IDocumentSummariser`, `ICardStore`, `IFetchGate`, `IRunObserver`, `SummaryCardExporter`, `JsonCardStore` | This repository, in `Files` or a small `OpenTail.Dolphin.Cards` package (no new dependency either way). |
 | `source.contentTag` metadata | The Graph, Drive and object storage connectors. |
 | The summariser (model choice, prompt, cost limits) | The Host. |
 | Search over cards, query-time permission checks, curation screens, the tag vocabulary | The Host. |

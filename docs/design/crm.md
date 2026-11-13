@@ -27,10 +27,10 @@ them into documents that carry their source context, using the existing `ISource
 
 | Package | Contents | Dependencies |
 |---|---|---|
-| `OpenTail.Connectivity.Crm` (shared) | Object configuration, field allow-list, record renderer, exclusion filters. | none |
-| `OpenTail.Connectivity.Crm.HubSpot` | HubSpot connector | none (plain `HttpClient` with the shared REST helper) |
-| `OpenTail.Connectivity.Crm.Salesforce` | Salesforce connector | none (REST and SOQL over `HttpClient`) |
-| `OpenTail.Connectivity.Crm.Dynamics` | Dynamics 365 / Dataverse connector, later | `Azure.Identity` (already in the repo) |
+| `OpenTail.Dolphin.Crm` (shared) | Object configuration, field allow-list, record renderer, exclusion filters. | none |
+| `OpenTail.Dolphin.Crm.HubSpot` | HubSpot connector | none (plain `HttpClient` with the shared REST helper) |
+| `OpenTail.Dolphin.Crm.Salesforce` | Salesforce connector | none (REST and SOQL over `HttpClient`) |
+| `OpenTail.Dolphin.Crm.Dynamics` | Dynamics 365 / Dataverse connector, later | `Azure.Identity` (already in the repo) |
 
 Start with one system. Which one depends on the customers; HubSpot is the simpler API, Salesforce the more common in larger
 businesses. Pipedrive, Zoho and others follow the same shape and can reuse the shared package.

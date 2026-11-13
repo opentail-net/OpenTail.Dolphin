@@ -38,10 +38,10 @@ selection, redaction on, and a high sensitivity marker.
 
 | Package | Contents | Dependencies |
 |---|---|---|
-| `OpenTail.Connectivity.Finance` (shared) | Money formatting, status filters, deny-list, sensitivity metadata, a GET-only HTTP handler, the token-store contract. | none |
-| `OpenTail.Connectivity.Finance.Stripe` | Stripe connector | none (`HttpClient`) |
-| `OpenTail.Connectivity.Finance.Xero` | Xero connector | none |
-| `OpenTail.Connectivity.Finance.QuickBooks` | QuickBooks Online connector | none |
+| `OpenTail.Dolphin.Finance` (shared) | Money formatting, status filters, deny-list, sensitivity metadata, a GET-only HTTP handler, the token-store contract. | none |
+| `OpenTail.Dolphin.Finance.Stripe` | Stripe connector | none (`HttpClient`) |
+| `OpenTail.Dolphin.Finance.Xero` | Xero connector | none |
+| `OpenTail.Dolphin.Finance.QuickBooks` | QuickBooks Online connector | none |
 
 No vendor SDKs: plain HTTPS keeps the dependency list and the audit surface small, and the read-only handler can inspect every
 request.

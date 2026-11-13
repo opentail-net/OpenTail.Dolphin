@@ -17,7 +17,7 @@
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.4.0" />
     <!-- Tests only: the VectorData adapter is proven against the in-memory connector (preview). -->
     <PackageVersion Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="1.74.0-preview" />
-    <!-- Tests only: OpenTail.Connectivity.Tests.PgVector, run by memory-pgvector.yml against a real server. -->
+    <!-- Tests only: OpenTail.Dolphin.Tests.PgVector, run by memory-pgvector.yml against a real server. -->
     <PackageVersion Include="Microsoft.SemanticKernel.Connectors.PgVector" Version="1.74.0-preview" />
     <PackageVersion Include="AWSSDK.S3" Version="4.0.104" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.30.1" />

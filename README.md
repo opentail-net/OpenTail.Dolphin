@@ -1,4 +1,4 @@
-# OpenTail Connectivity
+# OpenTail Dolphin
 
 Small .NET libraries that read content from where it lives: folders, web pages, CSV, email files, SQL databases, inboxes (IMAP,
 Microsoft Graph, Gmail), calendars (ICS feeds, Outlook, Google) and social platforms. They normalise it into documents with text and metadata. Source connectors only read; the Graph, Gmail and IMAP
@@ -10,35 +10,35 @@ They are used by the OpenTail Host's modules and by OpenTail itself.
 
 | Package | What | Verification |
 |---|---|---|
-| `OpenTail.Connectivity.Files` | The core: file and folder connector, text extraction, normalisation, validation, JSONL export. Every other package builds on it. Archive expansion (zip, tar, tar.gz) is newer and only Tested. | Verified |
-| `OpenTail.Connectivity.Web` | Web and URL connector with same-domain crawling and text extraction. | Tested |
-| `OpenTail.Connectivity.Csv` | CSV rows as documents, with column-level field mapping. | Verified |
-| `OpenTail.Connectivity.Email` | `.eml` files and `.mbox` archives. | Verified |
-| `OpenTail.Connectivity.Sql` | SQLite databases, with an allow-list of fields. | Verified |
-| `OpenTail.Connectivity.Social` | Social platforms (X, Reddit, YouTube, Meta), with sentiment scoring and marketing metadata. | Tested |
-| `OpenTail.Connectivity.Inbox.Imap` | IMAP inbox reader (MailKit), plus an SMTP sender. | Tested |
-| `OpenTail.Connectivity.Drive.Google` | Google Drive shared drives and My Drive through the changes feed: incremental, with deletions and checkpoints; Docs, Sheets and Slides exported. | Tested |
-| `OpenTail.Connectivity.Drive.Graph` | SharePoint libraries and OneDrive through Graph delta: incremental, with deletions and checkpoints. | Tested |
-| `OpenTail.Connectivity.Inbox.Graph` | Outlook inbox, sender and calendar (Microsoft Graph). | Tested |
-| `OpenTail.Connectivity.Inbox.Gmail` | Gmail inbox, sender and calendar (Gmail API). | Tested |
-| `OpenTail.Connectivity.Calendar.Ics` | ICS / iCalendar files and read-only ICS feed URLs. | Verified |
-| `OpenTail.Connectivity.RichText` | Rich text to plain text: Atlassian Document Format (Jira, Confluence), Confluence storage format, Notion blocks, Slack markup. Pure functions, also `ITextExtractor`s. | Tested |
-| `OpenTail.Connectivity.Storage` | Read-only object storage behind `IObjectStoreClient`; `ObjectStoreReader` lists and reads inside a prefix allow-list, with capped reads and bounded gzip. | Tested |
-| `OpenTail.Connectivity.Storage.S3` | Amazon S3 and S3-compatible stores (AWS SDK), through a caller-supplied `HttpClient`. | Tested |
-| `OpenTail.Connectivity.Storage.AzureBlob` | Azure Blob Storage adapter, through a caller-supplied `BlobContainerClient`. | Tested |
-| `OpenTail.Connectivity.Storage.Sftp` | Read-only SFTP adapter with a required pinned SHA-256 host key. | Tested |
-| `OpenTail.Connectivity.Storage.Dropbox` | Read-only Dropbox adapter using the HTTP API and refresh-token authentication. | Tested |
-| `OpenTail.Connectivity.Storage.Gcs` | Google Cloud Storage adapter using caller-supplied credentials and HTTP transport. | Tested |
-| `OpenTail.Connectivity.Storage.WebDav` | Read-only WebDAV adapter for collection listing and bounded downloads. | Tested |
-| `OpenTail.Connectivity.Storage.Box` | Read-only Box folder adapter using caller-supplied bearer credentials. | Tested |
-| `OpenTail.Connectivity.Memory` | Memory: records with typed provenance and policy, the `IMemoryBackend` contract, governance that reads fields and never text, governed retrieval, ingestion, a conformance suite and a quality gate. In-memory and Markdown-files backends included. See [memory](docs/design/memory.md). | Verified |
-| `OpenTail.Connectivity.Memory.Sqlite` | Memory backend in one SQLite file: FTS5 keyword search, every governance rule applied in SQL before ranking. | Verified |
-| `OpenTail.Connectivity.Memory.VectorData` | Memory backend over any `Microsoft.Extensions.VectorData` collection (Postgres with pgvector, Qdrant, Azure AI Search ...), the caller's embedding model. | Verified |
-| `OpenTail.Connectivity.Queues` | Work queues: the `IWorkQueue` contract (at-least-once, leases, delays, idempotency keys, dead letters), an in-memory queue and a conformance suite every implementation must pass. | Tested |
-| `OpenTail.Connectivity.Queues.Sqlite` | Work queue in one SQLite file: survives crashes and power cuts (WAL, `synchronous=FULL`), safe for several workers and processes on one machine. | Tested |
-| `OpenTail.Connectivity.MongoDb` | Governed read-only MongoDB queries (collections, find, aggregate, count) over allowed collections: an operator allow-list by context, request and response bounds, `maxTimeMS` and a comment on every operation. Tested against `mongo:8` in CI. [Usage](docs/mongodb.md). | Tested |
-| `OpenTail.Connectivity.Queues.Redis` | Queue control in Redis or Valkey: concurrency slots, circuits, rate starts and cancellations shared by RabbitMQ workers on several machines, on the server's clock. Conformance suite and an outage test against Redis 7.4 and Valkey 8 in CI. | Tested |
-| `OpenTail.Connectivity.Queues.RabbitMQ` | Work queue on RabbitMQ quorum queues: publisher confirms, delays through wait queues, leases that expire; keys are carried, not deduplicated. Passes the conformance suite against a real broker in CI. | Tested |
+| `OpenTail.Dolphin.Files` | The core: file and folder connector, text extraction, normalisation, validation, JSONL export. Every other package builds on it. Archive expansion (zip, tar, tar.gz) is newer and only Tested. | Verified |
+| `OpenTail.Dolphin.Web` | Web and URL connector with same-domain crawling and text extraction. | Tested |
+| `OpenTail.Dolphin.Csv` | CSV rows as documents, with column-level field mapping. | Verified |
+| `OpenTail.Dolphin.Email` | `.eml` files and `.mbox` archives. | Verified |
+| `OpenTail.Dolphin.Sql` | SQLite databases, with an allow-list of fields. | Verified |
+| `OpenTail.Dolphin.Social` | Social platforms (X, Reddit, YouTube, Meta), with sentiment scoring and marketing metadata. | Tested |
+| `OpenTail.Dolphin.Inbox.Imap` | IMAP inbox reader (MailKit), plus an SMTP sender. | Tested |
+| `OpenTail.Dolphin.Drive.Google` | Google Drive shared drives and My Drive through the changes feed: incremental, with deletions and checkpoints; Docs, Sheets and Slides exported. | Tested |
+| `OpenTail.Dolphin.Drive.Graph` | SharePoint libraries and OneDrive through Graph delta: incremental, with deletions and checkpoints. | Tested |
+| `OpenTail.Dolphin.Inbox.Graph` | Outlook inbox, sender and calendar (Microsoft Graph). | Tested |
+| `OpenTail.Dolphin.Inbox.Gmail` | Gmail inbox, sender and calendar (Gmail API). | Tested |
+| `OpenTail.Dolphin.Calendar.Ics` | ICS / iCalendar files and read-only ICS feed URLs. | Verified |
+| `OpenTail.Dolphin.RichText` | Rich text to plain text: Atlassian Document Format (Jira, Confluence), Confluence storage format, Notion blocks, Slack markup. Pure functions, also `ITextExtractor`s. | Tested |
+| `OpenTail.Dolphin.Storage` | Read-only object storage behind `IObjectStoreClient`; `ObjectStoreReader` lists and reads inside a prefix allow-list, with capped reads and bounded gzip. | Tested |
+| `OpenTail.Dolphin.Storage.S3` | Amazon S3 and S3-compatible stores (AWS SDK), through a caller-supplied `HttpClient`. | Tested |
+| `OpenTail.Dolphin.Storage.AzureBlob` | Azure Blob Storage adapter, through a caller-supplied `BlobContainerClient`. | Tested |
+| `OpenTail.Dolphin.Storage.Sftp` | Read-only SFTP adapter with a required pinned SHA-256 host key. | Tested |
+| `OpenTail.Dolphin.Storage.Dropbox` | Read-only Dropbox adapter using the HTTP API and refresh-token authentication. | Tested |
+| `OpenTail.Dolphin.Storage.Gcs` | Google Cloud Storage adapter using caller-supplied credentials and HTTP transport. | Tested |
+| `OpenTail.Dolphin.Storage.WebDav` | Read-only WebDAV adapter for collection listing and bounded downloads. | Tested |
+| `OpenTail.Dolphin.Storage.Box` | Read-only Box folder adapter using caller-supplied bearer credentials. | Tested |
+| `OpenTail.Dolphin.Memory` | Memory: records with typed provenance and policy, the `IMemoryBackend` contract, governance that reads fields and never text, governed retrieval, ingestion, a conformance suite and a quality gate. In-memory and Markdown-files backends included. See [memory](docs/design/memory.md). | Verified |
+| `OpenTail.Dolphin.Memory.Sqlite` | Memory backend in one SQLite file: FTS5 keyword search, every governance rule applied in SQL before ranking. | Verified |
+| `OpenTail.Dolphin.Memory.VectorData` | Memory backend over any `Microsoft.Extensions.VectorData` collection (Postgres with pgvector, Qdrant, Azure AI Search ...), the caller's embedding model. | Verified |
+| `OpenTail.Dolphin.Queues` | Work queues: the `IWorkQueue` contract (at-least-once, leases, delays, idempotency keys, dead letters), an in-memory queue and a conformance suite every implementation must pass. | Tested |
+| `OpenTail.Dolphin.Queues.Sqlite` | Work queue in one SQLite file: survives crashes and power cuts (WAL, `synchronous=FULL`), safe for several workers and processes on one machine. | Tested |
+| `OpenTail.Dolphin.MongoDb` | Governed read-only MongoDB queries (collections, find, aggregate, count) over allowed collections: an operator allow-list by context, request and response bounds, `maxTimeMS` and a comment on every operation. Tested against `mongo:8` in CI. [Usage](docs/mongodb.md). | Tested |
+| `OpenTail.Dolphin.Queues.Redis` | Queue control in Redis or Valkey: concurrency slots, circuits, rate starts and cancellations shared by RabbitMQ workers on several machines, on the server's clock. Conformance suite and an outage test against Redis 7.4 and Valkey 8 in CI. | Tested |
+| `OpenTail.Dolphin.Queues.RabbitMQ` | Work queue on RabbitMQ quorum queues: publisher confirms, delays through wait queues, leases that expire; keys are carried, not deduplicated. Passes the conformance suite against a real broker in CI. | Tested |
 
 **Verification legend:**
 - **Verified**: Exercised against the real thing in CI (local filesystem, real SQLite, pgvector in CI containers).
@@ -81,8 +81,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Build and test
 
 ```
-dotnet build OpenTail.Connectivity.slnx
-dotnet test --solution OpenTail.Connectivity.slnx
+dotnet build OpenTail.Dolphin.slnx
+dotnet test --solution OpenTail.Dolphin.slnx
 ```
 
 ## Releases

@@ -8,8 +8,8 @@ The conformance suite covers the connectors listed below (WP7), and all packages
 
 | Feature | Status | Notes |
 |---|---|---|
-| Conformance suite | ✅ Implemented | `SourceConnectorConformance` in `OpenTail.Connectivity.Files/Conformance/` |
-| Conformance coverage | ✅ Source connectors | Folder, CSV, SQLite, EML, Mbox, RSS, SiteCrawl, the four social connectors and `ObjectStorageConnector` (over the in-memory client; check 8 skipped because its watermark overlap re-reads recent objects on purpose) in `OpenTail.Connectivity.Tests/Conformance/`, and the Graph and Google Drive connectors over stubbed APIs (in their own test classes). Not run through the suite: the inbox and calendar adapters, which are not source connectors and have their own unit tests. |
+| Conformance suite | ✅ Implemented | `SourceConnectorConformance` in `OpenTail.Dolphin.Files/Conformance/` |
+| Conformance coverage | ✅ Source connectors | Folder, CSV, SQLite, EML, Mbox, RSS, SiteCrawl, the four social connectors and `ObjectStorageConnector` (over the in-memory client; check 8 skipped because its watermark overlap re-reads recent objects on purpose) in `OpenTail.Dolphin.Tests/Conformance/`, and the Graph and Google Drive connectors over stubbed APIs (in their own test classes). Not run through the suite: the inbox and calendar adapters, which are not source connectors and have their own unit tests. |
 | Verification labels | ✅ Implemented | All packages labeled in README and package descriptions |
 | Verified packages | ✅ 8 packages | Files, Csv, Email, Sql, Memory, Memory.Sqlite, Memory.VectorData, Calendar.Ics |
 | Tested packages | ✅ 16 packages | Web, Social, Inbox.Imap, Inbox.Graph, Inbox.Gmail, Drive.Graph, Drive.Google, RichText, Storage and its seven adapters (S3, AzureBlob, Sftp, Dropbox, Gcs, WebDav, Box) |
@@ -17,7 +17,7 @@ The conformance suite covers the connectors listed below (WP7), and all packages
 
 ## Where tests stand
 
-`OpenTail.Connectivity.Tests` holds the unit, stubbed-service and conformance tests, using xunit v3 on Microsoft.Testing.Platform.
+`OpenTail.Dolphin.Tests` holds the unit, stubbed-service and conformance tests, using xunit v3 on Microsoft.Testing.Platform.
 CI builds and tests on Ubuntu and Windows, with warnings as errors and the package vulnerability audit on. The SQL Server test file
 is checked in as `.cs_ignored`, which shows the difficulty: tests that need an external service tend to be switched off and then
 forgotten.
@@ -35,7 +35,7 @@ label.
 
 ## Conformance tests every connector must pass ✅ IMPLEMENTED
 
-A shared test suite is implemented in `OpenTail.Connectivity.Files/Conformance/SourceConnectorConformance.cs`. Every connector 
+A shared test suite is implemented in `OpenTail.Dolphin.Files/Conformance/SourceConnectorConformance.cs`. Every connector 
 passes the suite through a fixture implementing `IConnectorFixture`:
 
 1. ✅ `DiscoverAsync` yields items with non-empty `Id`, a tenant context and a real `Modified` time.
@@ -48,9 +48,9 @@ passes the suite through a fixture implementing `IConnectorFixture`:
 8. ✅ For incremental connectors: a second run from a saved checkpoint returns only changes, resuming from an earlier checkpoint
    repeats the same items, and no change is skipped (see [sync-and-deletions.md](sync-and-deletions.md)).
 
-**Coverage:** Folder, CSV, SQLite, EML, Mbox, RSS, SiteCrawl, the four social connectors and `ObjectStorageConnector` (over the in-memory client; check 8 skipped because its watermark overlap re-reads recent objects on purpose) in `OpenTail.Connectivity.Tests/Conformance/`, and the Graph and Google Drive connectors over stubbed APIs (in their own test classes). Not run through the suite: the inbox and calendar adapters, which are not source connectors and have their own unit tests.
+**Coverage:** Folder, CSV, SQLite, EML, Mbox, RSS, SiteCrawl, the four social connectors and `ObjectStorageConnector` (over the in-memory client; check 8 skipped because its watermark overlap re-reads recent objects on purpose) in `OpenTail.Dolphin.Tests/Conformance/`, and the Graph and Google Drive connectors over stubbed APIs (in their own test classes). Not run through the suite: the inbox and calendar adapters, which are not source connectors and have their own unit tests.
 
-**Location:** Conformance fixtures live in `OpenTail.Connectivity.Tests/Conformance/`.
+**Location:** Conformance fixtures live in `OpenTail.Dolphin.Tests/Conformance/`.
 
 ## Fixtures and fakes
 
@@ -92,4 +92,4 @@ policy-disabled sender throws.
 
 - Who owns the live accounts and their cost? *(Still to be determined)*
 - Is a nightly live workflow acceptable to the maintainers? *(Still to be determined)*
-- ✅ **Resolved:** The conformance suite lives in `OpenTail.Connectivity.Files` (production code) and is consumed by test fixtures in `OpenTail.Connectivity.Tests`. This makes it reusable for extensions.
+- ✅ **Resolved:** The conformance suite lives in `OpenTail.Dolphin.Files` (production code) and is consumed by test fixtures in `OpenTail.Dolphin.Tests`. This makes it reusable for extensions.

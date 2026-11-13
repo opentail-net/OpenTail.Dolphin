@@ -3,10 +3,10 @@
 ## Ingest a folder to JSONL
 
 ```csharp
-using OpenTail.Connectivity.Files.Connectors;
-using OpenTail.Connectivity.Files.Export;
-using OpenTail.Connectivity.Files.Extraction;
-using OpenTail.Connectivity.Files.Pipeline;
+using OpenTail.Dolphin.Files.Connectors;
+using OpenTail.Dolphin.Files.Export;
+using OpenTail.Dolphin.Files.Extraction;
+using OpenTail.Dolphin.Files.Pipeline;
 
 var source = new FolderSourceConnector("/data/docs", tenantContext: "acme");
 await using var jsonl = new JsonlDocumentExporter("out.jsonl");
@@ -31,7 +31,7 @@ Check `report.ValidationIssues` and `report.Errors` after a run: warnings do not
 
 ## Write a new source
 
-Implement `ISourceConnector` (in `OpenTail.Connectivity.Files.Contracts`):
+Implement `ISourceConnector` (in `OpenTail.Dolphin.Files.Contracts`):
 
 ```csharp
 public interface ISourceConnector
@@ -66,5 +66,5 @@ Implement `IConnectivityExporter`: `ExportAsync` is called per document, `FlushA
 
 ## Tests
 
-Tests live in `OpenTail.Connectivity.Tests` and run with `dotnet test --solution OpenTail.Connectivity.slnx`. A new connector
+Tests live in `OpenTail.Dolphin.Tests` and run with `dotnet test --solution OpenTail.Dolphin.slnx`. A new connector
 should come with tests there.

@@ -1,6 +1,6 @@
 name: Work queue on RabbitMQ
 
-# The RabbitMQ work queue against a real broker (OpenTail.Connectivity.Tests.RabbitMQ): the work queue conformance suite, in
+# The RabbitMQ work queue against a real broker (OpenTail.Dolphin.Tests.RabbitMQ): the work queue conformance suite, in
 # real time. Linux only and never on every push, to save Actions minutes: run it by hand, or it runs when the queue packages,
 # these tests or this workflow change.
 
@@ -9,9 +9,9 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'OpenTail.Connectivity.Queues/**'
-      - 'OpenTail.Connectivity.Queues.RabbitMQ/**'
-      - 'OpenTail.Connectivity.Tests.RabbitMQ/**'
+      - 'OpenTail.Dolphin.Queues/**'
+      - 'OpenTail.Dolphin.Queues.RabbitMQ/**'
+      - 'OpenTail.Dolphin.Tests.RabbitMQ/**'
       - '.github/workflows/queues-rabbitmq.yml'
 
 permissions:
@@ -41,7 +41,7 @@ jobs:
           global-json-file: global.json
 
       - name: Build
-        run: dotnet build OpenTail.Connectivity.Tests.RabbitMQ -c Release
+        run: dotnet build OpenTail.Dolphin.Tests.RabbitMQ -c Release
 
       - name: Test
         env:
@@ -49,7 +49,7 @@ jobs:
           OTAIL_QUEUE_RABBITMQ: amqp://guest:guest@localhost:5672/
         # A skipped test here means the URI is missing, or a capability check that should run did not: fail rather than pass quietly.
         run: |
-          dotnet test --project OpenTail.Connectivity.Tests.RabbitMQ -c Release --no-build 2>&1 | tee test.log
+          dotnet test --project OpenTail.Dolphin.Tests.RabbitMQ -c Release --no-build 2>&1 | tee test.log
           status=${PIPESTATUS[0]}
           skipped=$(grep -Eo "skipped: [0-9]+" test.log | grep -Eo "[0-9]+" | tail -1)
           # Skipped by design: the five key-deduplication checks (no DeduplicatesKeys) and the two that list running jobs (no ListsRunningJobs).

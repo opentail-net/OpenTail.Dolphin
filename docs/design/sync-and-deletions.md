@@ -3,7 +3,7 @@
 **Status:** built (2026-10-20). The sync core (`IIncrementalSourceConnector`, checkpoints, flush-before-commit, `ISyncCursorStore`,
 `FileSyncCursorStore`), deletions (`SourceChange.Delete`, `IDeletionExporter`, `JsonlDeletionExporter`), the retry list and
 full-run comparison (`SeenSourceRefs`) are all implemented. See `docs/done/ingestion-hardening.md` for implementation work
-packages. The first change-feed connector is `OpenTail.Connectivity.Drive.Graph` (Graph delta). 
+packages. The first change-feed connector is `OpenTail.Dolphin.Drive.Graph` (Graph delta). 
 
 **Implementation note:** Retries use `FetchAsync` directly rather than the `FindAsync` method shown in the contract below, so
 `FindAsync` is not part of the actual interface. The sections below are the original design for reference.
@@ -56,7 +56,7 @@ saves the cursor. If the run stops anywhere, the next run resumes from the last 
 ### The connector
 
 ```csharp
-namespace OpenTail.Connectivity.Files.Contracts;
+namespace OpenTail.Dolphin.Files.Contracts;
 
 public interface IIncrementalSourceConnector : ISourceConnector
 {

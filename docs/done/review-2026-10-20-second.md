@@ -40,7 +40,7 @@ Each fix starts with its regression test, which must fail first, as before.
 
 ## S1. SQLite incremental cursor can stop making progress *(confirmed; worse than reported)* ✅
 
-`OpenTail.Connectivity.Sql/SqliteSourceConnector.cs`: the checkpoint holds only the last modified value (`KeysetCursor` stores
+`OpenTail.Dolphin.Sql/SqliteSourceConnector.cs`: the checkpoint holds only the last modified value (`KeysetCursor` stores
 `lastMod`). A resumed run starts at `modified >= @m`, so it re-reads every row that shares the checkpointed value. The comment
 says this is deliberate, so rows are repeated rather than missed.
 

@@ -7,7 +7,7 @@ The REST helper (section 5) remains unbuilt; read-only checks (section 6) are pa
 This document is kept for reference. See [architecture.md](../architecture.md) for current behavior.
 
 This covers the shared pieces named in [roadmap.md](../roadmap.md) that every new connector would otherwise reinvent, all inside
-`OpenTail.Connectivity.Files`. No new package and no new dependency is needed.
+`OpenTail.Dolphin.Files`. No new package and no new dependency is needed.
 
 ## Principles
 
@@ -169,7 +169,7 @@ Tests use a fake `HttpMessageHandler`. No new dependency is needed.
 
 **Problem.** Multiple connectors need shared file filtering logic (patterns, extensions, size limits).
 
-**Implementation.** `FileFilterOptions` and `FileFilter` are now public in `OpenTail.Connectivity.Files` and used by folder,
+**Implementation.** `FileFilterOptions` and `FileFilter` are now public in `OpenTail.Dolphin.Files` and used by folder,
 Drive, and object storage connectors. Pattern semantics: `*` within segments, `**` across segments, case-insensitive, exclude
 before include.
 

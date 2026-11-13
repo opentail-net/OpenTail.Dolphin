@@ -9,7 +9,7 @@ decision; sections whose items are all done are only there. Ideas nothing needs 
 
 Each item names the repository it touches and links the page that explains it:
 
-- **[C]** this repository, `opentail-connectivity`.
+- **[C]** this repository, `OpenTail.Dolphin`.
 - **[H]** [`OpenTail.Orca`](https://github.com/opentail-net/OpenTail.Orca).
 - **[O]** [`opentail`](https://github.com/opentail-net/opentail), the developer product that uses this repository.
 - **[Owner]** a decision or a task for the product owner, not code. Listed in full in [with-owner.md](with-owner.md); the plan keeps
@@ -22,7 +22,7 @@ Each item names the repository it touches and links the page that explains it:
 | The owner's decisions ([with-owner.md](with-owner.md)) | The open questions in sections 12 to 18 and 21 (notifications, data exits, adaptive-limit delays, backlog staleness, work items, audit retention and targets, triggers' repository, licence and name); the S3-compatible server for CI (31) |
 | Customers | Section 5, which gates tiers 2 and 3 (section 7, frozen) and the Host memory module (M9) |
 | Real accounts and systems | Live-provider suites (section 29), a Meta test account for the Graph v25.0 fields (29), Atlas for M5 (30), vendor facts (section 9), Entra ID roles (12), an external check (17), write-once storage (18) |
-| Something built first | Host sign-in (section 3), and with it delegation (12) and Slack; triggers T1 to T7 (21); the review-page items G1, G2, G6 (19); the Host MongoDB module, once `OpenTail.Connectivity.MongoDb` is published (30) |
+| Something built first | Host sign-in (section 3), and with it delegation (12) and Slack; triggers T1 to T7 (21); the review-page items G1, G2, G6 (19); the Host MongoDB module, once `OpenTail.Dolphin.MongoDb` is published (30) |
 | Assessment time | M7 and M8 (section 20): no new package goes into opentail until the owner has assessed them |
 | Ready to start | Refusing API keys without a profile (12) |
 | Optional or deferred | Notion, Zendesk and Freshdesk, Slack front door, the model-based redactor; queue ideas in optional-todo.md; the Pinecone backend (30, parked by the owner) |
@@ -277,10 +277,10 @@ review. Nothing built.
   before ranking, a durable record state and settling (records with pending changes excluded inside the query) so deletes and
   ACL changes never come back during Pinecone's write lag, the
   embedding contract (model id, cosine, `MinScore`) and a namespace per tenant; Pinecone Local spike first.
-- [x] **[C]** M1 to M4: `OpenTail.Connectivity.MongoDb`, one collection per query, exact operator allow-list by context (no `$facet`,
+- [x] **[C]** M1 to M4: `OpenTail.Dolphin.MongoDb`, one collection per query, exact operator allow-list by context (no `$facet`,
   `$regex`, `$push` in the first version), resource bounds, option checks at start-up, CI on `mongo:8` ([usage](mongodb.md)).
   *Built 2026-10-23; first built in the Host by mistake, moved to connectivity (owner).*
-- [ ] **[H]** A thin Host module over `OpenTail.Connectivity.MongoDb` (agent tools, policy, audit), once the package is published.
+- [ ] **[H]** A thin Host module over `OpenTail.Dolphin.MongoDb` (agent tools, policy, audit), once the package is published.
 - [ ] **[Owner]** Accounts for Atlas (M5) and Pinecone (P5): [with-owner.md](with-owner.md#accounts-and-test-systems)
 
 ## 31. External reviews, 2026-10-23 (to-fix 1 to 5)

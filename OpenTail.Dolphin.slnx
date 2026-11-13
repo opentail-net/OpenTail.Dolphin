@@ -1,0 +1,40 @@
+<Solution>
+  <Folder Name="/Connectivity/">
+    <Project Path="OpenTail.Dolphin.Files/OpenTail.Dolphin.Files.csproj" />
+    <Project Path="OpenTail.Dolphin.Storage.S3/OpenTail.Dolphin.Storage.S3.csproj" />
+    <Project Path="OpenTail.Dolphin.Storage.AzureBlob/OpenTail.Dolphin.Storage.AzureBlob.csproj" />
+    <Project Path="OpenTail.Dolphin.Storage.Sftp/OpenTail.Dolphin.Storage.Sftp.csproj" />
+    <Project Path="OpenTail.Dolphin.Storage.Dropbox/OpenTail.Dolphin.Storage.Dropbox.csproj" />
+    <Project Path="OpenTail.Dolphin.Storage.Gcs/OpenTail.Dolphin.Storage.Gcs.csproj" />
+    <Project Path="OpenTail.Dolphin.Storage.WebDav/OpenTail.Dolphin.Storage.WebDav.csproj" />
+    <Project Path="OpenTail.Dolphin.Storage.Box/OpenTail.Dolphin.Storage.Box.csproj" />
+    <Project Path="OpenTail.Dolphin.Storage/OpenTail.Dolphin.Storage.csproj" />
+    <Project Path="OpenTail.Dolphin.Web/OpenTail.Dolphin.Web.csproj" />
+    <Project Path="OpenTail.Dolphin.Csv/OpenTail.Dolphin.Csv.csproj" />
+    <Project Path="OpenTail.Dolphin.Email/OpenTail.Dolphin.Email.csproj" />
+    <Project Path="OpenTail.Dolphin.Sql/OpenTail.Dolphin.Sql.csproj" />
+    <Project Path="OpenTail.Dolphin.RichText/OpenTail.Dolphin.RichText.csproj" />
+    <Project Path="OpenTail.Dolphin.Memory/OpenTail.Dolphin.Memory.csproj" />
+    <Project Path="OpenTail.Dolphin.Memory.Sqlite/OpenTail.Dolphin.Memory.Sqlite.csproj" />
+    <Project Path="OpenTail.Dolphin.Memory.VectorData/OpenTail.Dolphin.Memory.VectorData.csproj" />
+    <Project Path="OpenTail.Dolphin.Queues/OpenTail.Dolphin.Queues.csproj" />
+    <Project Path="OpenTail.Dolphin.Queues.Sqlite/OpenTail.Dolphin.Queues.Sqlite.csproj" />
+    <Project Path="OpenTail.Dolphin.Queues.RabbitMQ/OpenTail.Dolphin.Queues.RabbitMQ.csproj" />
+    <Project Path="OpenTail.Dolphin.Queues.Redis/OpenTail.Dolphin.Queues.Redis.csproj" />
+    <Project Path="OpenTail.Dolphin.MongoDb/OpenTail.Dolphin.MongoDb.csproj" />
+    <Project Path="OpenTail.Dolphin.Tests.RabbitMQ/OpenTail.Dolphin.Tests.RabbitMQ.csproj" />
+    <Project Path="OpenTail.Dolphin.Tests.Redis/OpenTail.Dolphin.Tests.Redis.csproj" />
+    <Project Path="OpenTail.Dolphin.Tests.MongoDb/OpenTail.Dolphin.Tests.MongoDb.csproj" />
+    <Project Path="OpenTail.Dolphin.Social/OpenTail.Dolphin.Social.csproj" />
+    <Project Path="OpenTail.Dolphin.Inbox.Imap/OpenTail.Dolphin.Inbox.Imap.csproj" />
+    <Project Path="OpenTail.Dolphin.Drive.Google/OpenTail.Dolphin.Drive.Google.csproj" />
+    <Project Path="OpenTail.Dolphin.Drive.Graph/OpenTail.Dolphin.Drive.Graph.csproj" />
+    <Project Path="OpenTail.Dolphin.Inbox.Graph/OpenTail.Dolphin.Inbox.Graph.csproj" />
+    <Project Path="OpenTail.Dolphin.Inbox.Gmail/OpenTail.Dolphin.Inbox.Gmail.csproj" />
+    <Project Path="OpenTail.Dolphin.Calendar.Ics/OpenTail.Dolphin.Calendar.Ics.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="OpenTail.Dolphin.Tests/OpenTail.Dolphin.Tests.csproj" />
+    <Project Path="OpenTail.Dolphin.Tests.PgVector/OpenTail.Dolphin.Tests.PgVector.csproj" />
+  </Folder>
+</Solution>

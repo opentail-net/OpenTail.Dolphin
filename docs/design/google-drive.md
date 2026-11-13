@@ -1,6 +1,6 @@
 # Design: Google Drive
 
-**Status:** slice 1 built (2026-10-20) as `OpenTail.Connectivity.Drive.Google`, plus `MyDrive` targets and the token scope check
+**Status:** slice 1 built (2026-10-20) as `OpenTail.Dolphin.Drive.Google`, plus `MyDrive` targets and the token scope check
 from slice 2. Tested against a stubbed Google API only; **not yet run against a real Workspace**. How it differs from the sketch
 below: it calls the Drive REST API over `HttpClient` with the existing `Google.Apis.Auth` token source, so `Google.Apis.Drive.v3`
 is **not** a new dependency after all; there are no `CapturePermissions`, `DownloadContent` or `IncludeSharedWithMe` options yet;
@@ -20,7 +20,7 @@ incremental through the Drive changes feed. One drive per connector instance.
 
 ## Package and dependencies
 
-New package **`OpenTail.Connectivity.Drive.Google`**, alongside `Drive.Graph`. It needs `Google.Apis.Drive.v3`, a **new**
+New package **`OpenTail.Dolphin.Drive.Google`**, alongside `Drive.Graph`. It needs `Google.Apis.Drive.v3`, a **new**
 dependency (the repository already uses `Google.Apis.Auth`, `Gmail.v1` and `Calendar.v3`), which goes in
 `Directory.Packages.props` and is covered by the CI vulnerability audit. It does not reference `Inbox.Gmail`.
 
@@ -29,7 +29,7 @@ Adding the project changes build files, which needs the maintainers' agreement f
 ## Public shape (sketch)
 
 ```csharp
-namespace OpenTail.Connectivity.Drive.Google;
+namespace OpenTail.Dolphin.Drive.Google;
 
 public sealed class GoogleDriveConnector : IIncrementalSourceConnector
 {

@@ -25,21 +25,21 @@ over that cloud's SDK, so consumers take only the SDK they use and the logic is 
 
 | Package | Contains | Depends on |
 |---|---|---|
-| `OpenTail.Connectivity.Storage` | `ObjectStorageConnector`, `IObjectStoreClient`, the cursor logic | `Files` only |
-| `OpenTail.Connectivity.Storage.S3` | `S3ObjectStoreClient` | `AWSSDK.S3` (new). Also serves S3-compatible stores (MinIO, R2 and others) through the SDK's service URL. |
-| `OpenTail.Connectivity.Storage.AzureBlob` | `AzureBlobObjectStoreClient` | `Azure.Storage.Blobs` (new); `Azure.Identity` is already pinned |
-| `OpenTail.Connectivity.Storage.Gcs` | `GcsObjectStoreClient` | `Google.Cloud.Storage.V1` (new) |
-| `OpenTail.Connectivity.Storage.Sftp` | `SftpObjectStoreClient` | `SSH.NET` |
-| `OpenTail.Connectivity.Storage.Dropbox` | `DropboxObjectStoreClient` | HTTP API, no SDK |
-| `OpenTail.Connectivity.Storage.WebDav` | `WebDavObjectStoreClient` | HTTP, no SDK |
-| `OpenTail.Connectivity.Storage.Box` | `BoxObjectStoreClient` | HTTP API, no SDK |
+| `OpenTail.Dolphin.Storage` | `ObjectStorageConnector`, `IObjectStoreClient`, the cursor logic | `Files` only |
+| `OpenTail.Dolphin.Storage.S3` | `S3ObjectStoreClient` | `AWSSDK.S3` (new). Also serves S3-compatible stores (MinIO, R2 and others) through the SDK's service URL. |
+| `OpenTail.Dolphin.Storage.AzureBlob` | `AzureBlobObjectStoreClient` | `Azure.Storage.Blobs` (new); `Azure.Identity` is already pinned |
+| `OpenTail.Dolphin.Storage.Gcs` | `GcsObjectStoreClient` | `Google.Cloud.Storage.V1` (new) |
+| `OpenTail.Dolphin.Storage.Sftp` | `SftpObjectStoreClient` | `SSH.NET` |
+| `OpenTail.Dolphin.Storage.Dropbox` | `DropboxObjectStoreClient` | HTTP API, no SDK |
+| `OpenTail.Dolphin.Storage.WebDav` | `WebDavObjectStoreClient` | HTTP, no SDK |
+| `OpenTail.Dolphin.Storage.Box` | `BoxObjectStoreClient` | HTTP API, no SDK |
 
 All seven adapters are built; see [storage-locations.md](../storage-locations.md) for what each does and what remains.
 
 ## Public shape (sketch)
 
 ```csharp
-namespace OpenTail.Connectivity.Storage;
+namespace OpenTail.Dolphin.Storage;
 
 public interface IObjectStoreClient
 {
@@ -225,7 +225,7 @@ against the real service.
 
 ## Suggested slices
 
-1. `OpenTail.Connectivity.Storage` with `IObjectStoreClient`, `ObjectContent`, `.gz` handling and in-memory client tests. No cloud
+1. `OpenTail.Dolphin.Storage` with `IObjectStoreClient`, `ObjectContent`, `.gz` handling and in-memory client tests. No cloud
    dependency.
 2. `Storage.S3`, built with a caller-supplied `HttpClient` in its tests.
 3. The Host's `storage` module (`list`, `read`) on S3: the live path, and the first real consumer.

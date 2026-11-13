@@ -1,6 +1,6 @@
 # Permission-policy follow-up fixes
 
-**Scope:** Additional implementation gaps noticed while reviewing the permission-policy changes on `main` on 21 October 2026. This is deliberately a supplement to [`source-permissions-and-isolation.md`](https://github.com/opentail-net/opentail-connectivity/blob/main/docs/design/source-permissions-and-isolation.md), not a replacement for it.
+**Scope:** Additional implementation gaps noticed while reviewing the permission-policy changes on `main` on 21 October 2026. This is deliberately a supplement to [`source-permissions-and-isolation.md`](https://github.com/opentail-net/OpenTail.Dolphin/blob/main/docs/design/source-permissions-and-isolation.md), not a replacement for it.
 
 The existing design already tracks tenant isolation, ACL-aware version skipping, provider ACL capture, consumer-path enforcement, ACL freshness/revocation, and the general requirement to deny when identity/group resolution fails. Those items are not repeated here. This note records the more specific gaps found in the current helper and its tests.
 
@@ -26,9 +26,9 @@ The existing design already tracks tenant isolation, ACL-aware version skipping,
 
 **Likely files**
 
-- `OpenTail.Connectivity.Files/Security/DocumentAccessPolicy.cs`
-- `OpenTail.Connectivity.Tests/DocumentAccessPolicyTests.cs`
-- If needed, the ACL metadata contract comments in `OpenTail.Connectivity.Files/Models/SourceKeys.cs`.
+- `OpenTail.Dolphin.Files/Security/DocumentAccessPolicy.cs`
+- `OpenTail.Dolphin.Tests/DocumentAccessPolicyTests.cs`
+- If needed, the ACL metadata contract comments in `OpenTail.Dolphin.Files/Models/SourceKeys.cs`.
 
 ## 2. Represent identity/group-resolution completeness in the access context
 
@@ -54,8 +54,8 @@ The broad deny-on-resolution-failure requirement is already in the main permissi
 
 **Likely files**
 
-- `OpenTail.Connectivity.Files/Security/DocumentAccessPolicy.cs`
-- `OpenTail.Connectivity.Tests/DocumentAccessPolicyTests.cs`
+- `OpenTail.Dolphin.Files/Security/DocumentAccessPolicy.cs`
+- `OpenTail.Dolphin.Tests/DocumentAccessPolicyTests.cs`
 - Any current call sites constructing `SourceAccessContext`.
 
 ## Completion check
@@ -63,6 +63,6 @@ The broad deny-on-resolution-failure requirement is already in the main permissi
 - [ ] Implement the public-grant/visibility invariant and regression tests.
 - [ ] Add explicit identity-resolution completeness to the access context and regression tests.
 - [ ] Build and run the relevant test suite; record the actual command and result in the change/PR.
-- [ ] Re-read the main [source-permissions-and-isolation plan](https://github.com/opentail-net/opentail-connectivity/blob/main/docs/design/source-permissions-and-isolation.md) and keep its broader items there rather than duplicating them in this follow-up note.
+- [ ] Re-read the main [source-permissions-and-isolation plan](https://github.com/opentail-net/OpenTail.Dolphin/blob/main/docs/design/source-permissions-and-isolation.md) and keep its broader items there rather than duplicating them in this follow-up note.
 
 **Verification note:** This document is based on source inspection. The tests have not been independently run as part of preparing this plan.

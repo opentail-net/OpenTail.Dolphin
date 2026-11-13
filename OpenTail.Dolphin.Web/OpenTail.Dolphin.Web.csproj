@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>OpenTail Dolphin — web/URL source connector with same-domain crawling and text extraction. Verification: Tested.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenTail.Dolphin.Files\OpenTail.Dolphin.Files.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenTail.Dolphin.Tests" />
+  </ItemGroup>
+</Project>

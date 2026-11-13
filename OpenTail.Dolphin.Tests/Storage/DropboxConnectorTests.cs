@@ -1,0 +1,259 @@
+using System.Net;
+using System.Text;
+using OpenTail.Dolphin.Files;
+using OpenTail.Dolphin.Files.Contracts;
+using OpenTail.Dolphin.Files.Models;
+using OpenTail.Dolphin.Files.Pipeline;
+using OpenTail.Dolphin.Storage;
+using OpenTail.Dolphin.Storage.Dropbox;
+
+namespace OpenTail.Dolphin.Tests.Storage;
+
+public sealed class DropboxConnectorTests
+{
+    private const string FileEntry = "{\".tag\":\"file\",\"path_display\":\"/root/report.txt\",\"size\":70,\"server_modified\":\"2026-10-01T10:00:00Z\",\"content_hash\":\"hash-1\"}";
+
+    [Fact]
+    public async Task First_run_pages_and_checkpoints_each_page()
+    {
+        var handler = new ApiHandler(request => request.Uri.AbsolutePath.EndsWith("/continue", StringComparison.Ordinal)
+            ? Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"c2\",\"has_more\":false}}")
+            : Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"c1\",\"has_more\":true}}"));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+        var connector = new DropboxConnector(client, "tenant", "dbid:acct-a", pageSize: 10);
+
+        var changes = await connector.GetChangesAsync(null).ToListAsync();
+
+        Assert.True(connector.ReportsDeletions);
+        Assert.Equal(2, changes.OfType<SourceChange.Upsert>().Count());
+        // Each saved cursor is the filter fingerprint, a colon, then Dropbox's own cursor.
+        Assert.Equal(["c1", "c2"], changes.OfType<SourceChange.Checkpoint>().Select(c => c.Cursor!.Split(':', 2)[1]));
+        var item = Assert.IsType<SourceChange.Upsert>(changes[0]).Item;
+        Assert.Equal("dropbox://dbid:acct-a//root/report.txt", item.Id);
+        Assert.Equal("hash-1", item.Metadata![SourceKeys.Version]);
+        Assert.Equal(new[] { "/2/files/list_folder", "/2/files/list_folder/continue" }, handler.Requests.Select(r => r.Uri.AbsolutePath));
+    }
+
+    [Fact]
+    public async Task Incremental_run_reports_deletions_and_changed_files()
+    {
+        var handler = new ApiHandler(_ => Json(HttpStatusCode.OK,
+            """{"entries":[{".tag":"deleted","path_display":"/root/gone.txt"},{".tag":"file","path_display":"/root/changed.txt","size":80,"server_modified":"2026-10-02T10:00:00Z","content_hash":"hash-2"}],"cursor":"c2","has_more":false}"""));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+        var connector = new DropboxConnector(client, "tenant", "dbid:acct-a");
+        var changes = await connector.GetChangesAsync(connector.CursorFingerprint + ":saved-cursor").ToListAsync();
+
+        var deletion = Assert.IsType<SourceChange.Delete>(Assert.Single(changes.OfType<SourceChange.Delete>()));
+        Assert.Equal("dropbox://dbid:acct-a//root/gone.txt", deletion.SourceRef);
+        Assert.Equal(DeletionReason.Deleted, deletion.Reason);
+        Assert.Equal("tenant", deletion.TenantContext);
+        Assert.Single(changes.OfType<SourceChange.Upsert>());
+        Assert.Equal("saved-cursor", handler.Requests[0].Body.RootElement.GetProperty("cursor").GetString());
+    }
+
+    [Fact]
+    public async Task Expired_cursor_resets_then_lists_from_root()
+    {
+        var handler = new ApiHandler(request => request.Uri.AbsolutePath.EndsWith("/continue", StringComparison.Ordinal)
+            ? Json(HttpStatusCode.Conflict, "{\"error_summary\":\"reset/..\"}")
+            : Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"fresh\",\"has_more\":false}}"));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+
+        var connector = new DropboxConnector(client, "tenant", "dbid:acct-a");
+        var changes = await connector.GetChangesAsync(connector.CursorFingerprint + ":expired").ToListAsync();
+
+        Assert.IsType<SourceChange.Reset>(changes[0]);
+        Assert.Single(changes.OfType<SourceChange.Upsert>());
+        Assert.Equal("fresh", Assert.Single(changes.OfType<SourceChange.Checkpoint>()).Cursor!.Split(':', 2)[1]);
+        Assert.Equal("/2/files/list_folder", handler.Requests[1].Uri.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task A_cursor_saved_under_another_filter_resets_and_lists_the_folder_again()
+    {
+        var handler = new ApiHandler(_ => Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"c9\",\"has_more\":false}}"));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+        var narrow = new DropboxConnector(client, "tenant", "dbid:acct-a", new FileFilterOptions(MaxFileSizeBytes: 10));
+        var wide = new DropboxConnector(client, "tenant", "dbid:acct-a", new FileFilterOptions(MaxFileSizeBytes: 10_000));
+        var saved = Assert.Single((await narrow.GetChangesAsync(null).ToListAsync()).OfType<SourceChange.Checkpoint>()).Cursor;
+
+        // Widening the filter must not leave files it now admits behind the saved cursor: the folder is listed again from its start.
+        var changes = await wide.GetChangesAsync(saved).ToListAsync();
+
+        Assert.IsType<SourceChange.Reset>(changes[0]);
+        Assert.False(handler.Requests[1].Body.RootElement.TryGetProperty("cursor", out _));
+    }
+
+    [Fact]
+    public async Task A_cursor_saved_before_the_filter_fingerprint_existed_lists_the_folder_again()
+    {
+        var handler = new ApiHandler(_ => Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"c1\",\"has_more\":false}}"));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+
+        // A plain Dropbox cursor from an earlier version: nothing says which filter it was made under.
+        var changes = await new DropboxConnector(client, "tenant", "dbid:acct-a").GetChangesAsync("plain-old-cursor").ToListAsync();
+
+        Assert.IsType<SourceChange.Reset>(changes[0]);
+        Assert.False(handler.Requests[0].Body.RootElement.TryGetProperty("cursor", out _));
+    }
+
+    [Fact]
+    public async Task Filtered_file_becomes_out_of_scope_deletion()
+    {
+        var handler = new ApiHandler(_ => Json(HttpStatusCode.OK,
+            """{"entries":[{".tag":"file","path_display":"/root/ignored.bin","size":12,"server_modified":"2026-10-02T10:00:00Z","content_hash":"hash"}],"cursor":"c","has_more":false}"""));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+
+        var changes = await new DropboxConnector(client, "tenant", "dbid:acct-a").GetChangesAsync(null).ToListAsync();
+        var change = Assert.IsType<SourceChange.Delete>(Assert.Single(changes.OfType<SourceChange.Delete>()));
+
+        Assert.Equal("dropbox://dbid:acct-a//root/ignored.bin", change.SourceRef);
+        Assert.Equal(DeletionReason.OutOfScope, change.Reason);
+    }
+
+    [Fact]
+    public async Task Generic_object_storage_resume_replays_a_sorted_dropbox_page_safely()
+    {
+        var entries = new[]
+        {
+            "{\".tag\":\"file\",\"path_display\":\"/root/c.txt\",\"size\":1,\"server_modified\":\"2026-10-03T10:00:00Z\",\"content_hash\":\"c\"}",
+            "{\".tag\":\"file\",\"path_display\":\"/root/b.txt\",\"size\":3,\"server_modified\":\"2026-10-02T10:00:00Z\",\"content_hash\":\"b\"}",
+            "{\".tag\":\"file\",\"path_display\":\"/root/a.txt\",\"size\":2,\"server_modified\":\"2026-10-01T10:00:00Z\",\"content_hash\":\"a\"}",
+        };
+        var call = 0;
+        var handler = new ApiHandler(_ =>
+        {
+            var reordered = call++ switch
+            {
+                0 => entries,
+                1 => entries.Reverse().ToArray(),
+                _ => [entries[1], entries[2], entries[0]],
+            };
+            return Json(HttpStatusCode.OK, $"{{\"entries\":[{string.Join(',', reordered)}],\"cursor\":\"cursor\",\"has_more\":false}}");
+        });
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+        var connector = new ObjectStorageConnector(client, "tenant", new ObjectStorageOptions(MaxBytesPerRun: 4));
+
+        var interrupted = await connector.GetChangesAsync(null).ToListAsync();
+        var midPageCursor = Assert.Single(interrupted.OfType<SourceChange.Checkpoint>()).Cursor;
+        var firstReplay = await connector.GetChangesAsync(midPageCursor).ToListAsync();
+        var secondReplay = await connector.GetChangesAsync(midPageCursor).ToListAsync();
+
+        Assert.Equal(["a.txt", "b.txt"], interrupted.OfType<SourceChange.Upsert>().Select(c => c.Item.DisplayName));
+        Assert.Equal(["c.txt"], firstReplay.OfType<SourceChange.Upsert>().Select(c => c.Item.DisplayName));
+        Assert.Equal(["c.txt"], secondReplay.OfType<SourceChange.Upsert>().Select(c => c.Item.DisplayName));
+    }
+
+    [Fact]
+    public async Task Pipeline_sends_dropbox_deletion_to_exporter_with_matching_document_id()
+    {
+        var handler = new ApiHandler(request =>
+        {
+            if (request.Uri.AbsolutePath.EndsWith("/files/download", StringComparison.Ordinal))
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("This is a sufficiently long plain text document for the pipeline validator.") };
+            if (request.Uri.AbsolutePath.EndsWith("/continue", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, """{"entries":[{".tag":"deleted","path_display":"/root/report.txt"}],"cursor":"c2","has_more":false}""");
+            return Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"c1\",\"has_more\":false}}");
+        });
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+        var connector = new DropboxConnector(client, "tenant", "dbid:acct-a");
+        var statePath = Path.Combine(Path.GetTempPath(), "otail-dropbox-" + Guid.NewGuid().ToString("N") + ".json");
+        var exporter = new RecordingExporter();
+        var options = new PipelineOptions(SyncStore: new FileSyncCursorStore(statePath), Sync: new SyncOptions(CheckpointEveryItems: 1));
+        try
+        {
+            await new ConnectivityPipeline(connector, new PlainTextExtractor(), [exporter], options, "dropbox").RunAsync();
+            await new ConnectivityPipeline(connector, new PlainTextExtractor(), [exporter], options, "dropbox").RunAsync();
+        }
+        finally
+        {
+            File.Delete(statePath);
+        }
+
+        var deletion = Assert.Single(exporter.Deletions);
+        Assert.Equal(ConnectivityPipeline.DocumentId("dropbox", "tenant", "dropbox://dbid:acct-a//root/report.txt"), deletion.Id);
+        Assert.Equal("dropbox://dbid:acct-a//root/report.txt", deletion.SourceRef);
+    }
+
+    [Fact]
+    public async Task Two_accounts_with_the_same_root_get_different_ids_and_sync_scopes_and_cannot_fetch_each_others_files()
+    {
+        var handler = new ApiHandler(request => request.Uri.AbsolutePath.EndsWith("/files/download", StringComparison.Ordinal)
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("hello") }
+            : request.Uri.AbsolutePath.EndsWith("/files/get_metadata", StringComparison.Ordinal)
+                ? Json(HttpStatusCode.OK, FileEntry)
+                : Json(HttpStatusCode.OK, $"{{\"entries\":[{FileEntry}],\"cursor\":\"c1\",\"has_more\":false}}"));
+        using var http = new HttpClient(handler);
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", http);
+        var a = new DropboxConnector(client, "tenant", "dbid:acct-a");
+        var b = new DropboxConnector(client, "tenant", "dbid:acct-b");
+
+        var itemA = Assert.Single(await a.DiscoverAsync().ToListAsync());
+        var itemB = Assert.Single(await b.DiscoverAsync().ToListAsync());
+
+        Assert.NotEqual(a.SyncScope, b.SyncScope);
+        Assert.NotEqual(itemA.Id, itemB.Id);
+        Assert.NotEqual(ConnectivityPipeline.DocumentId("dropbox", "tenant", itemA.Id), ConnectivityPipeline.DocumentId("dropbox", "tenant", itemB.Id));
+        Assert.Equal("dbid:acct-a//root", itemA.Metadata![SourceKeys.Container]);
+        Assert.Equal("hello"u8.ToArray(), await a.FetchAsync(itemA)); // each accepts its own ids
+        await Assert.ThrowsAsync<ArgumentException>(() => a.FetchAsync(itemB)); // and refuses the other account's
+    }
+
+    [Fact]
+    public void An_account_namespace_is_required()
+    {
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", new HttpClient(new ApiHandler(_ => Json(HttpStatusCode.OK, "{}"))));
+        Assert.Throws<ArgumentException>(() => new DropboxConnector(client, "tenant", " "));
+        Assert.Throws<ArgumentException>(() => new DropboxConnector(client, "tenant", "/"));
+    }
+
+    [Fact]
+    public async Task The_account_id_comes_from_the_current_account()
+    {
+        var handler = new ApiHandler(request => request.Uri.AbsolutePath.EndsWith("/users/get_current_account", StringComparison.Ordinal)
+            ? Json(HttpStatusCode.OK, """{"account_id":"dbid:AAH4f99T0taONIb-OurWxbNQ6ywGRopQngc","email":"x@example.com"}""")
+            : Json(HttpStatusCode.NotFound, "{}"));
+        using var client = new DropboxObjectStoreClient(_ => Task.FromResult("token"), "/root", new HttpClient(handler));
+
+        Assert.Equal("dbid:AAH4f99T0taONIb-OurWxbNQ6ywGRopQngc", await client.GetAccountIdAsync(TestContext.Current.CancellationToken));
+    }
+
+    private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
+        new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+
+    private sealed record SeenRequest(Uri Uri, System.Text.Json.JsonDocument Body);
+
+    private sealed class ApiHandler(Func<SeenRequest, HttpResponseMessage> respond) : HttpMessageHandler
+    {
+        public List<SeenRequest> Requests { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var body = request.Content is null ? "{}" : await request.Content.ReadAsStringAsync(cancellationToken);
+            var seen = new SeenRequest(request.RequestUri!, System.Text.Json.JsonDocument.Parse(body));
+            Requests.Add(seen);
+            return respond(seen);
+        }
+    }
+
+    private sealed class PlainTextExtractor : ITextExtractor
+    {
+        public TextExtractionResult Extract(string fileName, byte[] content) => new(true, Encoding.UTF8.GetString(content));
+    }
+
+    private sealed class RecordingExporter : IConnectivityExporter, IDeletionExporter
+    {
+        public List<DocumentDeletion> Deletions { get; } = [];
+        public Task ExportAsync(NormalisedDocument document, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task DeleteAsync(DocumentDeletion deletion, CancellationToken cancellationToken = default) { Deletions.Add(deletion); return Task.CompletedTask; }
+        public Task FlushAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+}

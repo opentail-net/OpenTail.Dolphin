@@ -151,7 +151,7 @@ whole setup.
 
 ## From the Connectivity design
 
-The [Connectivity SQL design](https://github.com/opentail-net/opentail-connectivity/blob/main/docs/design/sql-connectors.md) was
+The [Connectivity SQL design](https://github.com/opentail-net/OpenTail.Dolphin/blob/main/docs/design/sql-connectors.md) was
 written for ingestion. What carries over is used above: read-only rules per database, value formatting without the culture, and
 keeping connection details out of messages. Its identifier quoting and allow-lists do not apply, because here the AI writes the
 SQL; the login and the guard take their place.

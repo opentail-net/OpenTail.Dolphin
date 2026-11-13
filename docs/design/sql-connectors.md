@@ -14,7 +14,7 @@ as the existing SQLite connector, without making every consumer take every datab
 
 ## Today
 
-`SqliteSourceConnector` (in `OpenTail.Connectivity.Sql`) takes a `SqlConnectorConfig`: a connection string, a table or query, an
+`SqliteSourceConnector` (in `OpenTail.Dolphin.Sql`) takes a `SqlConnectorConfig`: a connection string, a table or query, an
 id field, a title field, body fields, and optional modified and metadata fields. It reads the listed columns only. Things to fix
 while generalising:
 
@@ -30,14 +30,14 @@ while generalising:
 
 ## Package layout
 
-Keep `OpenTail.Connectivity.Sql` as it is for SQLite, and add a provider-neutral core and one small package per driver:
+Keep `OpenTail.Dolphin.Sql` as it is for SQLite, and add a provider-neutral core and one small package per driver:
 
 | Package | Contains | Depends on |
 |---|---|---|
-| `OpenTail.Connectivity.Sql` (existing) | `SqliteSourceConnector`, `SqlConnectorConfig`, `SqlRowTextExtractor`; gains the neutral `DbSourceConnector` and `ISqlDialect`. | `Microsoft.Data.Sqlite.Core` (unchanged) |
-| `OpenTail.Connectivity.Sql.SqlServer` | `SqlServerDialect`, a factory | `Microsoft.Data.SqlClient` |
-| `OpenTail.Connectivity.Sql.Postgres` | `PostgresDialect`, a factory | `Npgsql` |
-| `OpenTail.Connectivity.Sql.MySql` | `MySqlDialect`, a factory | `MySqlConnector` |
+| `OpenTail.Dolphin.Sql` (existing) | `SqliteSourceConnector`, `SqlConnectorConfig`, `SqlRowTextExtractor`; gains the neutral `DbSourceConnector` and `ISqlDialect`. | `Microsoft.Data.Sqlite.Core` (unchanged) |
+| `OpenTail.Dolphin.Sql.SqlServer` | `SqlServerDialect`, a factory | `Microsoft.Data.SqlClient` |
+| `OpenTail.Dolphin.Sql.Postgres` | `PostgresDialect`, a factory | `Npgsql` |
+| `OpenTail.Dolphin.Sql.MySql` | `MySqlDialect`, a factory | `MySqlConnector` |
 
 Each new package follows the repository's rules: central package versions in `Directory.Packages.props`, an entry in the solution
 file, a `Description`, tests, and a row in the README and [connectors.md](../connectors.md). The existing `SqliteSourceConnector`

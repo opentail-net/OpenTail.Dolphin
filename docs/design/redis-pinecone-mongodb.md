@@ -1,7 +1,7 @@
 # Plan: Redis/Valkey, Pinecone, MongoDB
 
 **Status:** plan, revised twice on 2026-10-23 after two external reviews (ChatGPT). **Built 2026-10-23:** R1 to R4 (the
-queue-control contract and the Redis/Valkey store) and M1 to M4 (the MongoDB reader, as the package `OpenTail.Connectivity.MongoDb`;
+queue-control contract and the Redis/Valkey store) and M1 to M4 (the MongoDB reader, as the package `OpenTail.Dolphin.MongoDb`;
 [usage](../mongodb.md)). **Not built:** Pinecone (parked by the owner), M5 (Atlas, owner's account), M6, and the Host module that
 turns the MongoDB reader into agent tools. Facts marked *to verify* come from documentation or memory; check them before the
 step that depends on them.
@@ -48,7 +48,7 @@ step that depends on them.
 |---|---|---|
 | **1. Redis/Valkey** | A shared queue-control store: slots, circuits, rate starts, cancellations, for every worker of a queue | Connectivity |
 | **2. Pinecone** | A memory backend (managed vector search) with the memory governance applied before ranking | Connectivity |
-| **3. MongoDB** | Governed read-only queries over one collection at a time, for agents | Connectivity (`OpenTail.Connectivity.MongoDb`); a thin Host module later |
+| **3. MongoDB** | Governed read-only queries over one collection at a time, for agents | Connectivity (`OpenTail.Dolphin.MongoDb`); a thin Host module later |
 
 Not planned: agents reading Redis directly (caches and session tokens), DynamoDB, Cassandra, Neo4j (on request).
 
@@ -56,7 +56,7 @@ Not planned: agents reading Redis directly (caches and session tokens), DynamoDB
 
 ## 1. Redis/Valkey as the shared queue-control store
 
-A package `OpenTail.Connectivity.Queues.Redis`, `RedisQueueControl : IQueueControl`, through StackExchange.Redis (MIT), working the
+A package `OpenTail.Dolphin.Queues.Redis`, `RedisQueueControl : IQueueControl`, through StackExchange.Redis (MIT), working the
 same against Redis and Valkey (BSD). Every **mutation** is one Lua script, so it is atomic on the server. Two logical operations
 take several calls: `UpdateCircuitAsync` (read, compute in C#, conditional write, retry) and `KeysAsync` (paged reads).
 
@@ -131,7 +131,7 @@ Valkey only; Cluster is documented as **designed for, not tested** until a Clust
   checks (`QueueControlConformance`), both stores pass; SQLite's renewal and cancellation-retention bugs fixed; RabbitMQ treats a
   refused renewal as a lost lease and hands the message back.*
 - [x] **R2** `RedisQueueControl`: scripts, value compare-and-set for circuits, key TTLs, registry pruning (scripts and
-  `KeysAsync`), prefix and encoding. *Built 2026-10-23 (`OpenTail.Connectivity.Queues.Redis`, StackExchange.Redis 3.3.1). Writing
+  `KeysAsync`), prefix and encoding. *Built 2026-10-23 (`OpenTail.Dolphin.Queues.Redis`, StackExchange.Redis 3.3.1). Writing
   the outage test found two gaps in the RabbitMQ queue, fixed with it: a control-store failure while a message was held left it
   unacknowledged on the channel (now parked back, no attempt used); and settling after the broker's ack could throw, leaving a
   lease for an acknowledged message whose expiry would publish the job again (settling after the ack is now best effort).*
@@ -309,7 +309,7 @@ record state follows R2, for deployments writing from several machines.
 
 ## 3. MongoDB: governed read-only queries (Connectivity)
 
-*Owner, 2026-10-23: this lives in opentail-connectivity as `OpenTail.Connectivity.MongoDb`, not in the Host and not with the Sql
+*Owner, 2026-10-23: this lives in OpenTail.Dolphin as `OpenTail.Dolphin.MongoDb`, not in the Host and not with the Sql
 packages (NoSQL does not belong there). It was first built as a Host module by mistake (the first plan said "Host" without asking)
 and moved the same day. The reader below is the package; a Host module that exposes it as agent tools (`collections`, `find`,
 `aggregate`, `count`, with policy and audit) is a thin wrapper, to follow once the package is published. Where this section says

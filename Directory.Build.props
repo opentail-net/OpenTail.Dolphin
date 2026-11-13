@@ -14,9 +14,9 @@
     <PackageId Condition="'$(PackageId)'==''">$(MSBuildProjectName)</PackageId>
     <Authors Condition="'$(Authors)'==''">OpenTail</Authors>
     <Company Condition="'$(Company)'==''">OpenTail</Company>
-    <Description Condition="'$(Description)'==''">$(MSBuildProjectName): an OpenTail Connectivity library.</Description>
-    <PackageProjectUrl>https://github.com/opentail-net/opentail-connectivity</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/opentail-net/opentail-connectivity</RepositoryUrl>
+    <Description Condition="'$(Description)'==''">$(MSBuildProjectName): an OpenTail Dolphin library.</Description>
+    <PackageProjectUrl>https://github.com/opentail-net/OpenTail.Dolphin</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/opentail-net/OpenTail.Dolphin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <!-- PolyForm Strict 1.0.0; shipped as a file because not every NuGet client knows the SPDX id. -->
     <PackageLicenseFile>LICENSE.md</PackageLicenseFile>

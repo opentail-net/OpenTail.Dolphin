@@ -6,7 +6,7 @@ The work package marked **(owner model)** stays with the main model.
 ## The idea
 
 Folders, buckets, SFTP servers and Dropbox are all places where named files live. Connectivity already has the abstraction for
-that: `IObjectStoreClient` in `OpenTail.Connectivity.Storage` (list with paging, head, size-capped read, read-only), implemented
+that: `IObjectStoreClient` in `OpenTail.Dolphin.Storage` (list with paging, head, size-capped read, read-only), implemented
 for S3. The Host's `storage` module lists and reads through it (`ObjectStoreReader`). So each new place is **one adapter**, and
 everything else follows from it: filters, capped reads, the Host tools, and (after ST1) ingestion through the pipeline with
 version-based skipping and deletion by full-run comparison.
@@ -53,17 +53,17 @@ mounted share already works through the folder connector) and Host tools for the
 
 These are the same rules as `docs/ingestion-hardening.md`, repeated so this plan stands alone:
 
-- Repository `C:\Git\split\opentail-connectivity` (.NET 10, `OpenTail.Connectivity.slnx`, xUnit tests in
-  `OpenTail.Connectivity.Tests`). Bash builds need `export GITHUB_PACKAGES_TOKEN=$(gh auth token)`.
+- Repository `C:\Git\split\OpenTail.Dolphin` (.NET 10, `OpenTail.Dolphin.slnx`, xUnit tests in
+  `OpenTail.Dolphin.Tests`). Bash builds need `export GITHUB_PACKAGES_TOKEN=$(gh auth token)`.
 - Keep existing contracts. Add types and optional members last; don't change `IObjectStoreClient` or `ObjectStoreReader`'s public
   shape.
-- New package: a folder `OpenTail.Connectivity.<Name>/` with a `.csproj` copied from `OpenTail.Connectivity.Storage.S3` (same
+- New package: a folder `OpenTail.Dolphin.<Name>/` with a `.csproj` copied from `OpenTail.Dolphin.Storage.S3` (same
   layout, `InternalsVisibleTo` the test project, a `<Description>` ending in "Verification: Tested."). Add it to
-  `OpenTail.Connectivity.slnx` and as a `ProjectReference` of the test project, and add a README table row (label `Tested`).
+  `OpenTail.Dolphin.slnx` and as a `ProjectReference` of the test project, and add a README table row (label `Tested`).
 - Tests first: each regression test must fail on the current code, then pass. One local commit per work package, message starting
   with its id (`ST2: ...`). **Do not push.** Don't edit `docs/` except where a package says so.
-- Run only the tests you touched, then `dotnet build OpenTail.Connectivity.slnx` once (0 warnings). Don't run
-  `OpenTail.Connectivity.Tests.PgVector`. No test may reach a real network service.
+- Run only the tests you touched, then `dotnet build OpenTail.Dolphin.slnx` once (0 warnings). Don't run
+  `OpenTail.Dolphin.Tests.PgVector`. No test may reach a real network service.
 - Match the surrounding style: file-scoped namespaces, terse comments that say why, `ConfigureAwait(false)` where the file uses it,
   invariant culture.
 - If a package turns out bigger or different than described, stop, write down what you found, and don't improvise a redesign.
@@ -88,7 +88,7 @@ A first, because ST1 makes every later adapter ingestible. B and C can run in ei
 Goal: one `IIncrementalSourceConnector` over any `IObjectStoreClient`, as `docs/design/object-storage.md` describes ("Mapping to
 documents", "Discovery and incremental runs"). Read those two sections first; this package follows them, with these choices:
 
-- File: `OpenTail.Connectivity.Storage/ObjectStorageConnector.cs`, plus
+- File: `OpenTail.Dolphin.Storage/ObjectStorageConnector.cs`, plus
   `public sealed record ObjectStorageOptions(string Prefix = "", FileFilterOptions? Filter = null, TimeSpan? WatermarkOverlap = null,
   long? MaxBytesPerRun = null, bool ReadColdStorage = false, int PageSize = 1000)`. The default overlap is 1 hour, and
   `MaxFileSizeBytes` defaults to 50 MB.
@@ -106,7 +106,7 @@ documents", "Discovery and incremental runs"). Read those two sections first; th
   `ObjectNotFoundException` propagates (the retry list drops it after its attempts). Decompress `.gz` with the same bounded logic
   `ObjectStoreReader` already uses: find it and reuse it, extracting a small internal helper if needed. Don't copy it.
 - `DiscoverAsync` lists everything under the prefix with the same filters (a full run).
-- Tests (new `OpenTail.Connectivity.Tests/Storage/ObjectStorageConnectorTests.cs`, using `InMemoryObjectStoreClient`):
+- Tests (new `OpenTail.Dolphin.Tests/Storage/ObjectStorageConnectorTests.cs`, using `InMemoryObjectStoreClient`):
   1. A first run yields every passing object, with a checkpoint per page, and ends with a watermark equal to the largest
      `LastModified`.
   2. A second run yields only objects at or after the watermark minus the overlap: an old object is not yielded, one modified
@@ -125,7 +125,7 @@ documents", "Discovery and incremental runs"). Read those two sections first; th
 
 ## ST2. Azure Blob adapter (medium)
 
-Package `OpenTail.Connectivity.Storage.AzureBlob`, depending on `Azure.Storage.Blobs` (D6) and `Storage`.
+Package `OpenTail.Dolphin.Storage.AzureBlob`, depending on `Azure.Storage.Blobs` (D6) and `Storage`.
 - `public sealed class AzureBlobObjectStoreClient(BlobContainerClient container) : IObjectStoreClient`. The caller builds the
   `BlobContainerClient` with its own credential and transport (the design's "caller-supplied HTTP client" rule).
   `Scheme = "azblob"`, `Container = container.Name`.
@@ -147,7 +147,7 @@ Package `OpenTail.Connectivity.Storage.AzureBlob`, depending on `Azure.Storage.B
 
 ## ST3. SFTP adapter (medium)
 
-Package `OpenTail.Connectivity.Storage.Sftp`, depending on `SSH.NET` (D6) and `Storage`.
+Package `OpenTail.Dolphin.Storage.Sftp`, depending on `SSH.NET` (D6) and `Storage`.
 - `public sealed record SftpSettings(string Host, int Port, string UserName, string HostKeySha256, string Root = "/")`, with
   authentication passed separately so secrets stay out of the record: `SftpObjectStoreClient(SftpSettings settings, string?
   password = null, string? privateKeyPem = null, string? privateKeyPassphrase = null)`. Exactly one of password or private key must
@@ -186,7 +186,7 @@ Package `OpenTail.Connectivity.Storage.Sftp`, depending on `SSH.NET` (D6) and `S
 
 ## ST4. Writer interface, with S3 and in-memory writers (small)
 
-- In `OpenTail.Connectivity.Storage/IObjectStoreWriter.cs`:
+- In `OpenTail.Dolphin.Storage/IObjectStoreWriter.cs`:
   ```csharp
   /// <summary>Writes to one bucket or container. Separate from IObjectStoreClient on purpose: a class never does both.</summary>
   public interface IObjectStoreWriter
@@ -220,7 +220,7 @@ Package `OpenTail.Connectivity.Storage.Sftp`, depending on `SSH.NET` (D6) and `S
 
 ## ST5. Dropbox adapter (medium)
 
-Package `OpenTail.Connectivity.Storage.Dropbox`, depending only on `Storage` (D6: no SDK).
+Package `OpenTail.Dolphin.Storage.Dropbox`, depending only on `Storage` (D6: no SDK).
 - `public sealed class DropboxObjectStoreClient(Func<CancellationToken, Task<string>> accessToken, string root = "", HttpClient?
   http = null) : IObjectStoreClient`. Add a static helper `DropboxTokens.FromRefreshToken(string appKey, string appSecret, string
   refreshToken, HttpClient? http = null)`, returning that function. It posts to `https://api.dropboxapi.com/oauth2/token` with
@@ -252,7 +252,7 @@ Package `OpenTail.Connectivity.Storage.Dropbox`, depending only on `Storage` (D6
 ## ST6. Dropbox incremental connector (medium)
 
 After ST5, in the same package: `DropboxConnector : IIncrementalSourceConnector`, using Dropbox's cursor like the Google Drive
-connector uses its change token. Use `OpenTail.Connectivity.Drive.Google/GoogleDriveConnector.cs` as the template for structure,
+connector uses its change token. Use `OpenTail.Dolphin.Drive.Google/GoogleDriveConnector.cs` as the template for structure,
 checkpoints and tests.
 - First run: `list_folder` (recursive) from the root, then `list_folder/continue` while `has_more`. Checkpoint after each page with
   the page's `cursor` (that cursor already holds the position for later changes, so there's no separate start token).
@@ -272,8 +272,8 @@ checkpoints and tests.
 
 ## ST7. Archive expander (medium) **(owner model)** — built
 
-Built as `IItemExpander` (`OpenTail.Connectivity.Files/Contracts`) and `ArchiveExpander` (`Files/Archives`), set as
-`PipelineOptions.Expander`. Tests: `OpenTail.Connectivity.Tests/Archives`.
+Built as `IItemExpander` (`OpenTail.Dolphin.Files/Contracts`) and `ArchiveExpander` (`Files/Archives`), set as
+`PipelineOptions.Expander`. Tests: `OpenTail.Dolphin.Tests/Archives`.
 
 - **Contract.** The pipeline fetches an item the expander claims once, exports each child as its own item and never the
   archive itself. Child id `<parent id>!/<entry path>`; nested levels add `!/`. Children carry the parent's metadata (its

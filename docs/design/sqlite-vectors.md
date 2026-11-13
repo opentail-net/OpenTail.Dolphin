@@ -56,7 +56,7 @@ CREATE INDEX ix_chunk_vectors_model_record ON chunk_vectors (model_id, record_id
 - **L2-normalised** at write and for the query, so cosine similarity is the dot product (`TensorPrimitives.Dot`), clamped to
   [−1, 1] against rounding. **A corrupt stored vector is skipped, not fatal:** a BLOB of the wrong length or with non-finite values
   is never scored, the search carries on with the rest, and the row is counted in the status (§6) so it can be repaired.
-- Packages for `OpenTail.Connectivity.Memory.Sqlite`: `Microsoft.Extensions.AI.Abstractions` (already pinned centrally) and
+- Packages for `OpenTail.Dolphin.Memory.Sqlite`: `Microsoft.Extensions.AI.Abstractions` (already pinned centrally) and
   `System.Numerics.Tensors` (a .NET 10 pin to add).
 
 ### 3. Atomic upsert, with embeddings generated first

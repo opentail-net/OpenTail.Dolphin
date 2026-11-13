@@ -1,4 +1,4 @@
-# Building on OpenTail Connectivity
+# Building on OpenTail Dolphin
 
 Yes: another project can add to the scope without changing this repository. The extension points are public interfaces and the
 design is built for composition. It is not built for inheritance. This page says what works today and where it is awkward.
@@ -7,7 +7,7 @@ design is built for composition. It is not built for inheritance. This page says
 
 | You want to | How | Notes |
 |---|---|---|
-| Add a new source | Implement `ISourceConnector` and an `ITextExtractor` in your own assembly. | Reference `OpenTail.Connectivity.Files` only. See [writing-a-connector.md](writing-a-connector.md). |
+| Add a new source | Implement `ISourceConnector` and an `ITextExtractor` in your own assembly. | Reference `OpenTail.Dolphin.Files` only. See [writing-a-connector.md](writing-a-connector.md). |
 | Add a new output | Implement `IConnectivityExporter`. | Several can run in one pipeline. |
 | Change documents on their way through | `PipelineOptions.Transformers`: each runs on the normalised document, in order, before validation and export; the content hash is taken after them. | Use it for redaction and enrichment. Wrapping the `ITextExtractor` or an `IConnectivityExporter` still works for changes those hooks cannot make. |
 | Pass facts from a connector | `SourceItem.Metadata` | Carried onto the document (permissions, URLs, `source.version`); see [design/shared-groundwork.md](design/shared-groundwork.md). |
@@ -37,7 +37,7 @@ These follow from how the code is written today.
 ## A minimal extension
 
 ```csharp
-// In your own project, referencing OpenTail.Connectivity.Files.
+// In your own project, referencing OpenTail.Dolphin.Files.
 public sealed class TicketConnector : ISourceConnector
 {
     public async IAsyncEnumerable<SourceItem> DiscoverAsync([EnumeratorCancellation] CancellationToken ct = default)

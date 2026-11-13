@@ -82,7 +82,7 @@ Less common, and worth keeping: a conformance suite every backend must pass, and
   beside concurrency limits. In-memory and SQLite exact; RabbitMQ through `IQueueControl.TryTakeStartAsync`.
 - **Key scopes:** `EnqueueRequest.KeyScope`: `Retention` (as before), `UntilFinished`, `WhilePending` (debounce).
 - **Trace context:** `traceparent` and `tracestate` stored at enqueue; the worker's `process {queue}` consumer activity on source
-  `OpenTail.Connectivity.Queues` continues the trace, with `messaging.*` attributes.
+  `OpenTail.Dolphin.Queues` continues the trace, with `messaging.*` attributes.
 - **Smaller:** `RedriveAsync(..., notBefore)` and bulk redrive spread over a window; dead jobs grouped by where, resource and
   reason on the Jobs page with "Bring back this group"; equal jitter (half fixed, half random) instead of ±20%.
 - **Conformance:** 42 checks. RabbitMQ passes all 35 that apply on `rabbitmq:4.1` (36 tests with the lease cap; 7 skipped by design).

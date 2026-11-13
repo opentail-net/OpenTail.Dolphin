@@ -1,16 +1,16 @@
-# OpenTail Connectivity: Implementation Status
+# OpenTail Dolphin: Implementation Status
 
 **Last Updated:** 2026-10-20  
-**Repository:** `opentail-connectivity`  
+**Repository:** `OpenTail.Dolphin`  
 **Version:** 0.x (pre-1.0)
 
-This document provides a comprehensive overview of what's implemented versus what's planned in OpenTail Connectivity. It serves as the single source of truth for implementation status across all design documents.
+This document provides a comprehensive overview of what's implemented versus what's planned in OpenTail Dolphin. It serves as the single source of truth for implementation status across all design documents.
 
 ---
 
 ## Executive Summary
 
-OpenTail Connectivity has completed its **core ingestion hardening phase** (plan section 26). The pipeline now provides:
+OpenTail Dolphin has completed its **core ingestion hardening phase** (plan section 26). The pipeline now provides:
 
 - ✅ **Stable document IDs** derived from source identity
 - ✅ **Incremental sync with deletions** via change feeds and full-run comparison
@@ -214,7 +214,7 @@ The consumer contract is **stable and implemented**. Downstream stores can rely 
 
 **Coverage:** All 10 connectors pass all applicable checks.
 
-**Implementation:** `OpenTail.Connectivity.Files/Conformance/SourceConnectorConformance.cs`
+**Implementation:** `OpenTail.Dolphin.Files/Conformance/SourceConnectorConformance.cs`
 
 ### Verification Labels
 
@@ -232,7 +232,7 @@ The consumer contract is **stable and implemented**. Downstream stores can rely 
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Unit tests | ✅ Comprehensive | ~40 test files in `OpenTail.Connectivity.Tests` |
+| Unit tests | ✅ Comprehensive | ~40 test files in `OpenTail.Dolphin.Tests` |
 | Integration tests | ✅ Comprehensive | SQLite, file system, temp directories |
 | Conformance tests | ✅ Complete | All connectors covered |
 | Regression tests | ✅ Added | RSS/Atom equivalence, sitemap cycles, duplicates |

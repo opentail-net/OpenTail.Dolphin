@@ -2,8 +2,8 @@
 
 **Status:** M1 to M6 built on 2026-10-20 (see [plan, section 20](../plan.md#20-plug-and-play-memory)); M7 and M8 wait for a
 Connectivity release, M9 for the owner. The contract sketches below were written first; the code is in
-`OpenTail.Connectivity.Memory` and differs in detail (for example `MemoryHit` also carries its disposition). Written
-2026-10-19 from a reading of `OpenTail.Core.Memory`, `OpenTail.Persistence.Sqlite` and `OpenTail.Connectivity.Index` in the
+`OpenTail.Dolphin.Memory` and differs in detail (for example `MemoryHit` also carries its disposition). Written
+2026-10-19 from a reading of `OpenTail.Core.Memory`, `OpenTail.Persistence.Sqlite` and `OpenTail.Dolphin.Index` in the
 `opentail` repository, and from the outside work listed under [what others do](#what-others-do).
 
 **Where it fits:** memory is input and output, like everything else in this repository: records go in, records come back out by
@@ -74,7 +74,7 @@ In `opentail`, MIT unless marked:
 | Evals | `MemoryEvalRunner`, scenarios, thresholds | | Regression gates |
 | SQLite substrate | `OpenTail.Persistence.Sqlite/OpenTailDatabase.cs` | 15 `Memory*` tables inside a 2,804-line file shared with the rest of opentail | Records, chunks, embeddings, entities, links, access policies, collections, retrieval logs, pins, decay, tags |
 | Vectors | `OpenTail.Pro/VectorDatabase.cs` | 144 lines, **PolyForm Noncommercial** | `MemoryRecordVectors` on sqlite-vec |
-| Document index | `OpenTail.Connectivity.Index` | SQLite chunk store, retriever, context packages | Uses `MemoryChunk` and the ingestion pipeline types |
+| Document index | `OpenTail.Dolphin.Index` | SQLite chunk store, retriever, context packages | Uses `MemoryChunk` and the ingestion pipeline types |
 
 ### The governance filter reads the text
 
@@ -298,7 +298,7 @@ M1 to M8 are groundwork; M9 waits on the owner. Ranges are rough; the drivers ar
 | | Step | Repo | Size | Driven by |
 |---|---|---|---|---|
 | M1 | **Fix the governance filter**: carry `MemoryRecord`/`MemoryPolicy` through `IMemoryStore` and `MemoryHit`; filters read fields; tests that words cannot raise trust | opentail | 1-3 days | How many callers use `MemoryHit` and the JSON metadata |
-| M2 | **Contracts** here as `OpenTail.Connectivity.Memory`: records, policy (+ `Tainted`), `IMemoryBackend`, capabilities, `MemoryHit` with `RecallRole`, model hook interfaces | connectivity | 1-2 days | Naming; tying `MemorySource` to stable ids and `source.acl.*` |
+| M2 | **Contracts** here as `OpenTail.Dolphin.Memory`: records, policy (+ `Tainted`), `IMemoryBackend`, capabilities, `MemoryHit` with `RecallRole`, model hook interfaces | connectivity | 1-2 days | Naming; tying `MemorySource` to stable ids and `source.acl.*` |
 | M3 | **Move the stack**: pipeline, planner, fusion, chunkers, entity extractor, consolidator, maintenance, evals, generic normalisers (GitHub, note, tool execution, project facts). Not Slack; not workflow, crew or diagnostics (opentail's own) | connectivity | 2-4 days | `HybridRetriever` and `LlmQueryCondenser` live in `OpenTail.Core` and use `IChatConnector`; replace with the hook interfaces |
 | M4 | **SQLite backend**, keyword first, from the 15 tables in `OpenTailDatabase.cs` | connectivity | 3-6 days | Untangling a shared 2,804-line file; whether to keep opentail's schema for migration or start clean |
 | M5 | **Conformance suite and quality gate**, SQLite as the first backend to pass | connectivity | 2-4 days | How much of `MemoryEvalScenarios` is reusable |
@@ -331,8 +331,8 @@ For the owner:
 
 Technical, answered while building:
 
-5. Package name: `OpenTail.Connectivity.Memory`, or a separate `OpenTail.Memory` family in this repository? *Built as
-   `OpenTail.Connectivity.Memory`, with backends as `.Memory.Sqlite` and `.Memory.VectorData`.*
+5. Package name: `OpenTail.Dolphin.Memory`, or a separate `OpenTail.Memory` family in this repository? *Built as
+   `OpenTail.Dolphin.Memory`, with backends as `.Memory.Sqlite` and `.Memory.VectorData`.*
 6. Does the files backend earn its place before a customer asks for it? *Built: it was cheap, needs no dependency, and is the
    shape Claude's memory tool and hooks use. It passes conformance and the gate.*
 7. Keep opentail's SQLite schema so existing local databases migrate, or start clean and re-ingest? *Clean: the record shape

@@ -1,6 +1,6 @@
 # Design: SharePoint, OneDrive and Teams files (Microsoft Graph)
 
-**Status:** slice 1 built (2026-10-20) as `OpenTail.Connectivity.Drive.Graph`, plus `UserOneDrive` targets and the delegated
+**Status:** slice 1 built (2026-10-20) as `OpenTail.Dolphin.Drive.Graph`, plus `UserOneDrive` targets and the delegated
 `scp` check from slice 2. Tested against stubbed Graph and download hosts only; **not yet run against a real tenant**. How it
 differs from the sketch below: it calls Graph over `HttpClient` with any `TokenCredential` rather than through the Graph SDK (the
 same-host and token checks stay visible and testable); there are no `CapturePermissions` or `DownloadContent` options yet (slice
@@ -21,7 +21,7 @@ their source context attached. Read-only, one drive per connector instance, incr
 
 ## Package and dependencies
 
-New package **`OpenTail.Connectivity.Drive.Graph`**, named like `Inbox.Graph` (category, then provider), with the Google
+New package **`OpenTail.Dolphin.Drive.Graph`**, named like `Inbox.Graph` (category, then provider), with the Google
 connector as `Drive.Google`. It references `Files`, `Microsoft.Graph` and `Azure.Identity`, which `Inbox.Graph` already pins in
 `Directory.Packages.props`, so no new third-party dependency. It does not reference `Inbox.Graph`, so file and mail permissions
 stay in separate packages.
@@ -31,7 +31,7 @@ Adding the project, its solution entry and its tests changes build files, which 
 ## Public shape (sketch)
 
 ```csharp
-namespace OpenTail.Connectivity.Drive.Graph;
+namespace OpenTail.Dolphin.Drive.Graph;
 
 public sealed class GraphDriveConnector : IIncrementalSourceConnector
 {

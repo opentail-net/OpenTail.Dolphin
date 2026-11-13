@@ -82,17 +82,17 @@ IEventSink    publish an event                      (new) tell an outside bus wh
 
 ## Built
 
-- **`OpenTail.Connectivity.Queues`:** `IWorkQueue` (enqueue with a key and a not-before time; lease, complete, retry, dead-letter,
+- **`OpenTail.Dolphin.Queues`:** `IWorkQueue` (enqueue with a key and a not-before time; lease, complete, retry, dead-letter,
   extend; list and redrive dead letters), `WorkQueueOptions` (max attempts 5, max age 24 hours, key retention 7 days, body cap
   256 KB), `InMemoryWorkQueue`, and `WorkQueueConformance`: 17 checks, run on a manual clock, or in real time for a broker.
-- **`OpenTail.Connectivity.Queues.Sqlite`:** one table, every change in an immediate transaction, WAL with `synchronous=FULL`.
+- **`OpenTail.Dolphin.Queues.Sqlite`:** one table, every change in an immediate transaction, WAL with `synchronous=FULL`.
   Passes all 17 checks; a separate test runs four worker instances on one file.
 - **Capabilities** declare what an implementation guarantees beyond at-least-once: `Durable`, `DelayedDelivery`, `LeaseExpiry`,
   `DeduplicatesKeys`. Checks for an undeclared capability are skipped. They exist for RabbitMQ: it has no native delayed delivery
   (a plugin, or TTL and dead-letter exchanges), no lease that expires while the consumer stays connected (unacknowledged messages
   return when the channel closes, or after `consumer_timeout`), and no deduplication on publish. Which of these the adapter can
   offer, and how, is step 3's first question. *To verify against RabbitMQ's documentation before building.*
-- **`OpenTail.Connectivity.Queues.RabbitMQ`:** quorum queues (work and `.dead`), publisher confirms with `mandatory`, and a
+- **`OpenTail.Dolphin.Queues.RabbitMQ`:** quorum queues (work and `.dead`), publisher confirms with `mandatory`, and a
   replacement is confirmed before the original is acknowledged (a crash duplicates, never loses). Delays: quorum "wait" queues
   with one TTL each (powers of 4 seconds, 1 second to about 3 days) dead-lettering back at-least-once; a job back early waits
   again, so never early and at most about a second late. Leases: unacknowledged deliveries; this instance returns expired ones
@@ -227,7 +227,7 @@ All of 1 to 5, plus bringing dead jobs back after an outage (owner's request). C
   the handler ends; reported), `ResourceUnavailableException` and timeouts, HTTP and socket errors feed the circuit, drain time on
   stop (10 s).
 - **Health and metrics:** `WorkQueueHealth.CheckAsync` (oldest waiting job, dead letters per hour, stuck jobs, open circuits) and
-  `WorkQueueMetrics` (meter `OpenTail.Connectivity.Queues`, counter `opentail.queue.worker.events`). The Host feeds each registered
+  `WorkQueueMetrics` (meter `OpenTail.Dolphin.Queues`, counter `opentail.queue.worker.events`). The Host feeds each registered
   queue into `/healthz` and shows it on the Jobs page.
 - **RabbitMQ:** `IQueueControl` (in-memory, `SqliteQueueControl`) replaces the cancelled-jobs store and also holds slots (expiring
   with the lease) and circuits. Jobs over a limit or behind an open circuit wait 4 seconds and are looked at again (at most 20 per

@@ -1,6 +1,6 @@
 name: MongoDB reader on a real server
 
-# The MongoDB reader against mongo:8 (OpenTail.Connectivity.Tests.MongoDb): the four operations with a read-only user, guard
+# The MongoDB reader against mongo:8 (OpenTail.Dolphin.Tests.MongoDb): the four operations with a read-only user, guard
 # refusals that never reach the server, the response caps, and the server time limit and comment on every operation. Linux only
 # and never on every push, to save Actions minutes: run it by hand, or it runs when the package, these tests or this workflow change.
 
@@ -9,8 +9,8 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'OpenTail.Connectivity.MongoDb/**'
-      - 'OpenTail.Connectivity.Tests.MongoDb/**'
+      - 'OpenTail.Dolphin.MongoDb/**'
+      - 'OpenTail.Dolphin.Tests.MongoDb/**'
       - '.github/workflows/mongodb.yml'
 
 permissions:
@@ -50,7 +50,7 @@ jobs:
           global-json-file: global.json
 
       - name: Build
-        run: dotnet build OpenTail.Connectivity.Tests.MongoDb -c Release
+        run: dotnet build OpenTail.Dolphin.Tests.MongoDb -c Release
 
       - name: Wait for MongoDB, then a read-only user
         run: |
@@ -66,7 +66,7 @@ jobs:
           OTAIL_MONGODB_READ_PASSWORD: ${{ env.READ_PASSWORD }}
         # A skipped test here means a variable is missing: fail rather than pass quietly.
         run: |
-          dotnet test --project OpenTail.Connectivity.Tests.MongoDb -c Release --no-build 2>&1 | tee test.log
+          dotnet test --project OpenTail.Dolphin.Tests.MongoDb -c Release --no-build 2>&1 | tee test.log
           status=${PIPESTATUS[0]}
           if grep -Eq "skipped: [1-9]" test.log; then echo "::error::Some server tests were skipped"; exit 1; fi
           exit $status

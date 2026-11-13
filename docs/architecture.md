@@ -1,7 +1,7 @@
 # Architecture
 
-OpenTail Connectivity is a set of small libraries that turn content from many places into one shape, `NormalisedDocument`.
-Everything builds on `OpenTail.Connectivity.Files`; the other packages add sources.
+OpenTail Dolphin is a set of small libraries that turn content from many places into one shape, `NormalisedDocument`.
+Everything builds on `OpenTail.Dolphin.Files`; the other packages add sources.
 
 ## The pipeline
 

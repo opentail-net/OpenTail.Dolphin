@@ -1,6 +1,6 @@
-# Licence for OpenTail Connectivity
+# Licence for OpenTail Dolphin
 
-Required Notice: Copyright 2026 OpenTail (https://github.com/opentail-net/opentail-connectivity)
+Required Notice: Copyright 2026 OpenTail (https://github.com/opentail-net/OpenTail.Dolphin)
 
 This licence applies to everything in this repository and to the packages built from it. Code released before 20 October 2026
 under the MIT licence stays under that licence for those who received it.

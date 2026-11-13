@@ -13,7 +13,7 @@ Written from reading `OpenTail.Orca` at `3dd97bb`; line numbers will drift. The 
 | 2. Files module reads text only | `OpenTail.Modules.Files/FilesModule.cs` | The read path decodes bytes as UTF-8 (around line 102). |
 | 3. A `storage` module for buckets | New module | See [object storage](../design/object-storage.md#live-tools-in-the-host). |
 | 4. Microsoft 365 files as a profile | `profiles/`, `OpenTail.Orca/PROFILES.md` | New profile. |
-| 5. Breaking changes from Connectivity | `Directory.Packages.props` (the `OpenTail.Connectivity.*` pins, version 0.1.0) | Email, Calendar, Microsoft365, Google, Email.Imap, Calendar.Ics and Web modules. |
+| 5. Breaking changes from Connectivity | `Directory.Packages.props` (the `OpenTail.Dolphin.*` pins, version 0.1.0) | Email, Calendar, Microsoft365, Google, Email.Imap, Calendar.Ics and Web modules. |
 | 6. Wikis | `profiles/`, a new module | A Confluence profile; Notion as a module; SharePoint pages in the Microsoft 365 work. See the [roadmap](../roadmap.md#wikis). |
 | 7. The query builder | `OpenTail.Modules.OpenApi` | The deferred query builder (`OpenTail.Orca/PROFILES.md`, "Deferred"), needed for Jira, Zendesk and Freshdesk profiles. |
 | 8. Slack | `OpenTail.Orca.Notifications`, a future Slack read profile | Keep the approval/notification app and any history-reading app separate. |
@@ -33,7 +33,7 @@ matches the intent (for `read`, a wide one), or in Connectivity by making the lo
 
 ## 2. The Files module reads text only
 
-`files.read` decodes the file as UTF-8, so PDFs and Office documents come back as unreadable text. `OpenTail.Connectivity.Files`,
+`files.read` decodes the file as UTF-8, so PDFs and Office documents come back as unreadable text. `OpenTail.Dolphin.Files`,
 which the Host already references, has `TransformationsTextExtractor` (file name and bytes in, text out). Using it in the read
 path would make `files.read` useful for documents, and is the same extraction tier 1 of
 [document search](../roadmap.md#document-search-in-three-tiers) needs for *read this file*. Keep a size cap before extraction.
@@ -58,7 +58,7 @@ cannot be a profile, for the same JWT reason as GCS; it would be a module next t
 
 ## 5. Breaking changes from Connectivity
 
-The Host pins `OpenTail.Connectivity.*` at 0.1.0 and uses `IInboxAdapter`, `IEmailSender`, `ICalendarAdapter`,
+The Host pins `OpenTail.Dolphin.*` at 0.1.0 and uses `IInboxAdapter`, `IEmailSender`, `ICalendarAdapter`,
 `InboxFetchOptions`, `InboxEmailRecord`, `CalendarEvent`, the IMAP, Graph and Gmail adapters and senders,
 `GmailCredentialProvider` and `HtmlTextExtractor`. It does not use the pipeline, `SourceItem`, `NormalisedDocument` or the
 exporters.

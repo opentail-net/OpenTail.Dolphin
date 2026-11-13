@@ -5,9 +5,9 @@
 The .NET SDK version is pinned in `global.json` (10.0.x). Then:
 
 ```
-dotnet restore OpenTail.Connectivity.slnx
-dotnet build OpenTail.Connectivity.slnx
-dotnet test --solution OpenTail.Connectivity.slnx
+dotnet restore OpenTail.Dolphin.slnx
+dotnet build OpenTail.Dolphin.slnx
+dotnet test --solution OpenTail.Dolphin.slnx
 ```
 
 Tests use xunit v3 on Microsoft.Testing.Platform, hence `--solution`. CI runs the same build and test on Ubuntu and Windows, so
@@ -28,8 +28,8 @@ paths and line endings need to work on both.
 ## Adding a connector
 
 See [docs/writing-a-connector.md](docs/writing-a-connector.md). New packages follow the existing layout: a project named
-`OpenTail.Connectivity.<Name>` with a `Description`, a reference to `OpenTail.Connectivity.Files`, an entry in
-`OpenTail.Connectivity.slnx`, tests in `OpenTail.Connectivity.Tests`, and a row in the README table and
+`OpenTail.Dolphin.<Name>` with a `Description`, a reference to `OpenTail.Dolphin.Files`, an entry in
+`OpenTail.Dolphin.slnx`, tests in `OpenTail.Dolphin.Tests`, and a row in the README table and
 [docs/connectors.md](docs/connectors.md).
 
 ## Versions and releases

@@ -1,0 +1,22 @@
+global using System.Text;
+global using System.Text.Json;
+global using Microsoft.Data.Sqlite;
+global using MimeKit;
+global using Xunit;
+global using OpenTail.Dolphin.Files.Connectors;
+global using OpenTail.Dolphin.Files.Contracts;
+global using OpenTail.Dolphin.Files.Export;
+global using OpenTail.Dolphin.Files.Models;
+global using OpenTail.Dolphin.Files.Extraction;
+global using OpenTail.Dolphin.Files.Pipeline;
+global using OpenTail.Dolphin.Files.Validation;
+global using OpenTail.Dolphin.Web;
+global using OpenTail.Dolphin.Sql;
+global using OpenTail.Dolphin.Email;
+global using OpenTail.Dolphin.Files.Inbox;
+global using OpenTail.Dolphin.Inbox.Imap;
+// global using OpenTail.Dolphin.Sql.SqlServer;
+global using OpenTail.Dolphin.Csv;
+
+global using OpenTail.Dolphin.Inbox.Gmail;
+global using OpenTail.Dolphin.Inbox.Graph;

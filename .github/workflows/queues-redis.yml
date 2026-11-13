@@ -1,6 +1,6 @@
 name: Queue control on Redis and Valkey
 
-# Redis/Valkey queue control against real servers (OpenTail.Connectivity.Tests.Redis): the IQueueControl conformance suite on
+# Redis/Valkey queue control against real servers (OpenTail.Dolphin.Tests.Redis): the IQueueControl conformance suite on
 # Redis 7.4 and Valkey 8, the RabbitMQ work queue conformance suite with Redis as its shared control store, and a Redis outage
 # through a proxy. Real time throughout. Linux only and never on every push, to save Actions minutes: run it by hand, or it runs
 # when the queue packages, these tests or this workflow change.
@@ -10,10 +10,10 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'OpenTail.Connectivity.Queues/**'
-      - 'OpenTail.Connectivity.Queues.Redis/**'
-      - 'OpenTail.Connectivity.Queues.RabbitMQ/**'
-      - 'OpenTail.Connectivity.Tests.Redis/**'
+      - 'OpenTail.Dolphin.Queues/**'
+      - 'OpenTail.Dolphin.Queues.Redis/**'
+      - 'OpenTail.Dolphin.Queues.RabbitMQ/**'
+      - 'OpenTail.Dolphin.Tests.Redis/**'
       - '.github/workflows/queues-redis.yml'
 
 permissions:
@@ -51,7 +51,7 @@ jobs:
           global-json-file: global.json
 
       - name: Build
-        run: dotnet build OpenTail.Connectivity.Tests.Redis -c Release
+        run: dotnet build OpenTail.Dolphin.Tests.Redis -c Release
 
       - name: Test
         env:
@@ -61,7 +61,7 @@ jobs:
         # Skipped by design: the RabbitMQ suite's seven checks for capabilities it does not declare. Anything else skipped means a
         # server variable is missing: fail rather than pass quietly.
         run: |
-          dotnet test --project OpenTail.Connectivity.Tests.Redis -c Release --no-build 2>&1 | tee test.log
+          dotnet test --project OpenTail.Dolphin.Tests.Redis -c Release --no-build 2>&1 | tee test.log
           status=${PIPESTATUS[0]}
           skipped=$(grep -Eo "skipped: [0-9]+" test.log | grep -Eo "[0-9]+" | tail -1)
           if [ "${skipped:-0}" != "7" ]; then echo "::error::Expected exactly 7 skipped tests, got ${skipped:-0}"; exit 1; fi

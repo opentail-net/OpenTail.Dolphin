@@ -38,7 +38,7 @@ removes them. So the write boundary that finding 5 asks for exists in the Host. 
 
 ## K1. Graph times *(confirmed; worse than reported)* ✅
 
-`OpenTail.Connectivity.Inbox.Graph/GraphCalendarMapper.cs:41-45` parses `DateTimeTimeZone.DateTime` with
+`OpenTail.Dolphin.Inbox.Graph/GraphCalendarMapper.cs:41-45` parses `DateTimeTimeZone.DateTime` with
 `DateTimeOffset.TryParse` and ignores `TimeZone`. Graph returns `dateTime` with **no offset**, in UTC unless a
 `Prefer: outlook.timezone` header asks otherwise, with `timeZone: "UTC"`. `TryParse` treats a zone-less string as **machine
 local time**. So on any server not set to UTC, every Graph event is shifted by the server's offset. CI runs in UTC, which hides

@@ -151,7 +151,7 @@ database sets on every write. Deleted rows are not reported.
 ## Object storage
 
 Use the shared `ObjectStorageConnector` with any `IObjectStoreClient` adapter. The Google Cloud Storage adapter is in
-`OpenTail.Connectivity.Storage.Gcs`; it takes a caller-built `StorageClient`, leaving credentials and HTTP transport under the
+`OpenTail.Dolphin.Storage.Gcs`; it takes a caller-built `StorageClient`, leaving credentials and HTTP transport under the
 caller's control:
 
 ```csharp
@@ -195,7 +195,7 @@ var source = new ObjectStorageConnector(webDav, tenantContext);
 
 The adapter is read-only and has XML-stubbed unit tests; it has not been verified against a live WebDAV service.
 
-The Box adapter is in `OpenTail.Connectivity.Storage.Box`. Supply an access token and the Box folder ID to use as the fixed
+The Box adapter is in `OpenTail.Dolphin.Storage.Box`. Supply an access token and the Box folder ID to use as the fixed
 root. Tokens are not refreshed by the adapter; Box access tokens are short-lived, so the caller must obtain a fresh one after
 an authentication failure. Listings recursively page through each folder with Box's marker API and return relative paths
 within the configured root. One listing snapshot is cached while paging; after process restart the token resumes by key and

@@ -28,8 +28,8 @@ The stale status lines in the two design docs are fixed in WP0.
 
 These go at the top of every prompt to the coding model:
 
-- Repository `C:\Git\split\opentail-connectivity` (.NET 10, `OpenTail.Connectivity.slnx`, xUnit tests in
-  `OpenTail.Connectivity.Tests`). Bash builds need `export GITHUB_PACKAGES_TOKEN=$(gh auth token)`.
+- Repository `C:\Git\split\OpenTail.Dolphin` (.NET 10, `OpenTail.Dolphin.slnx`, xUnit tests in
+  `OpenTail.Dolphin.Tests`). Bash builds need `export GITHUB_PACKAGES_TOKEN=$(gh auth token)`.
 - **Keep the existing contracts.** Add types and optional members; don't replace `ISourceConnector`, `IIncrementalSourceConnector`,
   `IConnectivityExporter` or `NormalisedDocument`. New members on public records go last and are optional, so existing calls compile.
 - **Rag.NET is a reference, not a source.** Read it, then write OpenTail's own code against OpenTail's contracts. If a block of
@@ -37,8 +37,8 @@ These go at the top of every prompt to the coding model:
   if missing) with Rag.NET's MIT copyright and licence text, and a comment at the adapted code naming the source file.
 - Tests first: each regression test must fail on the current code, then pass. One local commit per WP, with a message starting
   with the WP id (`WP1: ...`). **Do not push.**
-- Run only the tests you touched, then `dotnet build OpenTail.Connectivity.slnx` once (0 warnings). Don't run
-  `OpenTail.Connectivity.Tests.PgVector`.
+- Run only the tests you touched, then `dotnet build OpenTail.Dolphin.slnx` once (0 warnings). Don't run
+  `OpenTail.Dolphin.Tests.PgVector`.
 - Match the surrounding style: file-scoped namespaces, terse comments that say why, `ConfigureAwait(false)` where the file uses
   it, `TimeProvider` for anything time-based, invariant culture.
 - If a WP turns out bigger or different than described, stop, write down what you found, and don't improvise a redesign.
@@ -88,7 +88,7 @@ Files: `docs/design/sync-and-deletions.md`, `docs/design/testing-and-verificatio
 Goal: a connector can report "this item is gone", and the pipeline passes it to exporters that can apply it, in order with
 upserts, before the next checkpoint commits.
 
-Contracts (in `OpenTail.Connectivity.Files`, next to the existing ones):
+Contracts (in `OpenTail.Dolphin.Files`, next to the existing ones):
 ```csharp
 // Contracts/IIncrementalSourceConnector.cs, inside SourceChange:
 /// <summary>An item no longer exists at the source, or no longer matches the connector's filter.</summary>
@@ -125,7 +125,7 @@ Pipeline (`Pipeline/ConnectivityPipeline.cs`, the incremental loop around the `s
 - `FlushAsync` is already called before each commit. Make sure deletion exporters are flushed too (they are also
   `IConnectivityExporter`s, or document that a deletion-only exporter must implement both).
 
-Tests (`OpenTail.Connectivity.Tests/IncrementalSyncTests.cs`, extend its `Scripted` connector with a `"D:<ref>"` step that yields
+Tests (`OpenTail.Dolphin.Tests/IncrementalSyncTests.cs`, extend its `Scripted` connector with a `"D:<ref>"` step that yields
 `Delete(ref, DeletionReason.Deleted)`, and a `"D-:<ref>"` step for `OutOfScope`, plus a way to set `ReportsDeletions`):
 1. `U:a, D:b, C:1` with a recording deletion exporter: the exporter gets one `DocumentDeletion` with `Id ==
    ConnectivityPipeline.DocumentId(...)` for `b`, after `a` is exported and before the cursor `1` is saved (use the existing
@@ -249,10 +249,10 @@ an item whose token matches the one stored after its last successful export.
 
 ## WP7a. Connector conformance suite, plus the first three connectors (medium) ✅
 
-Model: `OpenTail.Connectivity.Memory/Conformance/MemoryBackendConformance.cs`, a public class that runs named checks against
+Model: `OpenTail.Dolphin.Memory/Conformance/MemoryBackendConformance.cs`, a public class that runs named checks against
 any backend and fails with a clear message. Do the same for connectors.
 
-- New `OpenTail.Connectivity.Files/Conformance/SourceConnectorConformance.cs`, public, with:
+- New `OpenTail.Dolphin.Files/Conformance/SourceConnectorConformance.cs`, public, with:
   ```csharp
   public interface IConnectorFixture
   {
@@ -280,7 +280,7 @@ any backend and fails with a clear message. Do the same for connectors.
   7. `CreateEmpty()` yields nothing and doesn't throw.
   8. For `IIncrementalSourceConnector`: a run from no cursor, then from its last checkpoint, yields no upserts when nothing
      changed. Resuming from the first checkpoint repeats exactly the items after it.
-- Apply it in `OpenTail.Connectivity.Tests/Conformance/` to: `FolderSourceConnector` (temp folder), `CsvSourceConnector`
+- Apply it in `OpenTail.Dolphin.Tests/Conformance/` to: `FolderSourceConnector` (temp folder), `CsvSourceConnector`
   (temp file), `SqliteSourceConnector` (temp database, including check 8). Each is one small fixture class plus one `[Fact]`
   calling `RunAsync`.
 - If a connector fails a check, **don't change the suite to make it pass.** Fix the connector if the fix is small and obvious

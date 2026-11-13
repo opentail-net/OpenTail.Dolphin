@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Description>OpenTail Dolphin — SQLite memory backend: keyword search with FTS5, every governance rule applied in SQL before ranking. Verification: Verified.</Description>
+    <PackageTags>opentail;connectivity;memory;sqlite;fts5</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
+    <PackageReference Include="System.Numerics.Tensors" />
+    <InternalsVisibleTo Include="OpenTail.Dolphin.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenTail.Dolphin.Memory\OpenTail.Dolphin.Memory.csproj" />
+  </ItemGroup>
+</Project>

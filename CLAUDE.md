@@ -17,5 +17,5 @@ Plans and designs live in `docs/design/`; the cross-repo checklist is `docs/plan
    about existing code that were not checked. State what is built and what is not consistently throughout.
 6. **Claims about existing code** ("X has this bug") only after reading X.
 
-These rules come from a plan (`opentail-connectivity/docs/design/redis-pinecone-mongodb.md`, 2026-10-23) that needed two external
+These rules come from a plan (`OpenTail.Dolphin/docs/design/redis-pinecone-mongodb.md`, 2026-10-23) that needed two external
 review rounds for basics: an interface not read, half of an existing filter mapped, a vendor's asynchronous writes not checked.
