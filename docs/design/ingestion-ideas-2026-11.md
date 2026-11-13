@@ -25,6 +25,9 @@ Each idea says what Dolphin has today, what would be added, and what must be che
 > This document was written under the same rule: only the two documentation pages were read, through `git show`, and no source file
 > was opened.
 
+**Section 9 is a later scan of our own code** in the places these ideas would touch. Where it corrects a statement in section 3,
+section 9 is right.
+
 **Limits.** I read the files named, not the projects. I ran nothing. The three are Python or JVM projects, so everything here is a
 design idea to rebuild in .NET, not something to port.
 
@@ -52,9 +55,9 @@ ingestion pipeline and retriever. Ideas that depend on them are marked *check fi
 | A2 | Three failure kinds: configuration, transient, system | Airbyte | Pipeline, `IngestionReport` | Small to medium | **High** |
 | A3 | A call budget per API, corrected from response headers | Airbyte | The REST helper (shared groundwork 5) | Medium | **High**, with the helper |
 | D1 | Context for each chunk before it is indexed | Search | `Memory` chunking and hooks | Medium | **High** for retrieval quality |
-| B2 | Tables split with their header repeated | unstructured | `Memory` chunkers | Small to medium | Medium |
-| B4 | File type by content, not only by extension | unstructured | Extraction, attachments | Small | Medium (a safety check) |
-| C3 | Say which metadata is embedded and which the model sees | LlamaIndex | `Memory` records | Small | Medium |
+| B2 | Tables split with their header repeated | unstructured | `Memory` default chunker | Small to medium | Medium to high (section 9) |
+| B4 | File type by content, not only by extension | unstructured | Extraction, attachments | Small | Low: mostly exists (section 9) |
+| C3 | Say which metadata is embedded and which the model sees | LlamaIndex | `Memory` records | Small | Low: a rule for embedder authors (section 9) |
 | B1 | Typed elements beside the flat body | unstructured | `ITextExtractor` | Large | Medium; design first |
 | A4 | A change count with each checkpoint | Airbyte | Incremental runs | Small | Low to medium |
 | C2 | One cache rule for every costly transformer | LlamaIndex | Transformers, embeddings | Small | Low: partly there |
@@ -285,3 +288,33 @@ never drop or flatten an ACL, because that turns a restricted document open.
 - WorkOS, RAG access control: https://workos.com/blog/rag-access-control-document-permissions
 - Particula, stale ACLs in RAG: https://particula.tech/blog/rag-document-acl-sync-stale-permissions
 - MCP blog, the 2026-07-28 release candidate: https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/
+
+## 9. Code scan before any work starts (2026-11-13)
+
+A look at the code a builder would open first for each idea. Nothing was changed and nothing was run. Read: the retry tracking
+and the fetch branch of `ConnectivityPipeline` (`ProcessAsync`, `TrackRetry`, the upsert case), `IIncrementalSourceConnector.cs`
+in full, `TransformationsTextExtractor` in full, `HierarchicalChunker` in full, the first 50 lines of
+`DefaultMemoryIngestionChunker`, and searches in `AttachmentProcessor` and `DefaultMemoryIngestionPipeline`.
+
+| Idea | What the code shows | What it changes in the proposal |
+|---|---|---|
+| A2 | **Confirmed.** `ProcessAsync` catches every exception from `FetchAsync` except cancellation, adds the message to `run.Errors` and returns `FetchFailed`. In an incremental run each one goes on the retry list, and when the list is full the cursor is held. Nothing looks at the kind of exception. In a full run each item fails on its own, so a bad credential gives one error per item. | The proposal stands. The stop must be raised in two places: the fetch branch, and the change stream (`GetChangesAsync` or `DiscoverAsync` throwing, which is rethrown as it is today). `Outcome` is a private enum, so a new outcome is a local change. Decide who classifies: a handful of places in the connectors catch HTTP errors or test for 401 and 403 themselves, so each connector must throw the new exception; the pipeline cannot guess it from a message. |
+| A1 | No check exists. `PerSecret<T>` holds one built client per secret value. | Stands. The check should use the same client the run uses, so it tests the real credential path. |
+| A4 | `SourceChange.Checkpoint(string Cursor)` is a sealed record in a public contract. | An optional count (`long? ChangesSince = null`) is source-compatible for connectors, but it changes a public record's constructor, so it is a contract change to release with a note. |
+| B4 | **Mostly exists.** The extraction library has `TextExtractor.DetectFormat(bytes)` and a `ContentTypeMismatch` warning, and `AttachmentProcessor` uses both. The gap is the main pipeline: `TransformationsTextExtractor.Extract` returns the text and metadata and passes no warnings on, and `TextExtractionResult` has no place for them. | Smaller than proposed, and no new detection code. Add a warnings list to `TextExtractionResult`, pass the library's warnings through, and have the pipeline record a mismatch as a validation warning. |
+| B1 | The extractor gets `Text` and a metadata object from the library, which it flattens to strings. Whether headings, tables or pages can be returned is decided in that library, not here. | Unchanged: ask the library first. It is a separate repository, so B1 is cross-repository work. |
+| B2 | **Section 3 named the wrong chunker.** The chunker in use by default is `DefaultMemoryIngestionChunker`. No production code constructs the hierarchical or sentence-window chunker; a deployment plugs them in. The default splits on blank lines, then on sentence ends (`.`, `!` or `?` followed by a space), with a limit of 480 characters. A table has no blank lines, so it is one segment, which is then cut wherever a cell ends a sentence or the limit falls. Rows lose their header and can be cut mid-row. | The work belongs in `DefaultMemoryIngestionChunker`: recognise a table segment before the sentence split, cut it on row boundaries, repeat the header. Worth more than section 3 said, because 480 characters is a few rows. |
+| D1 | `HierarchicalChunker`'s hierarchy is paragraph and sentence. **No chunker knows headings**, so there is no heading path to put in front of a chunk. `MemoryNormalizedEnvelope` has `Title` and `Summary`. `MemoryChunk` has no field for text that is indexed but not stored as content (`WindowText` is the sentence window). The embedder (`IMemoryIngestionEmbedder`) is called on the chunk list between chunking and storing, and the pipeline rejects the item if the embedder changes the number of chunks. | The free first step shrinks to the title, and the summary where there is one. A heading path needs a chunker that reads Markdown headings, which is new. The hook fits between the chunker and the embedder, and needs one new optional field on `MemoryChunk` for the index text. With 480-character chunks the context matters more: a chunk that small rarely names its subject. |
+| C3 | The embedder receives `MemoryChunk`s. Nothing in the library joins metadata into the text; what is embedded is the embedder's choice, and the default embedder does nothing. | No table needed. It becomes one rule in the embedder's contract: embed `Content` (and D1's index text), never a metadata value. |
+| C2 | Chunk ids are `chunk-<parent>-<ordinal>`. | A cache per chunk must be keyed by the chunk's own text, not its id: an edit early in a document shifts every later ordinal. |
+| A3 | Not scanned further: the REST helper it belongs to is not built. | Unchanged. |
+
+**Two more things the scan found.**
+
+- `TrackRetry` takes an item's error text from the last entry of `run.Errors`. That is right today, because the fetch branch adds
+  the error just before returning. A2 adds errors in more places, so pass the error to `TrackRetry` directly as part of that work.
+- The default chunk limit, 480 characters, is a constant. Retrieval work (B2, D1) will want to measure other sizes with the
+  quality gate, which needs it to be an option first.
+
+**Order, revised.** A2, then A1. Then B2 in the default chunker and D1's title step, both measured. B4 is now a small
+pass-through and can go with A2.
