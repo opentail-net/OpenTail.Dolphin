@@ -114,5 +114,3 @@ authenticate with `GITHUB_TOKEN`, or use a secret holding such a token.
 ## Licence
 
 Proprietary and commercial. All rights reserved. Any use needs a signed commercial licence agreement with OpenTail; see [LICENSE.md](LICENSE.md).
-
-Code released before 20 October 2026 under the MIT licence stays under that licence for those who received it.
