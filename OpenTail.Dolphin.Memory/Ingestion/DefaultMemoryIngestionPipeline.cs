@@ -16,6 +16,8 @@ public interface IMemoryIngestionChunker
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>Embeds chunks. It embeds <see cref="MemoryChunk.IndexText"/> when it is set and <see cref="MemoryChunk.Content"/> otherwise,
+/// never a metadata value: metadata is filtered on, not searched.</summary>
 public interface IMemoryIngestionEmbedder
 {
     Task<IReadOnlyList<MemoryChunk>> EmbedAsync(
@@ -47,12 +49,38 @@ public sealed class NoOpMemoryIngestionExtractor : IMemoryIngestionExtractor
         => Task.FromResult(envelope);
 }
 
+/// <summary>Options of <see cref="DefaultMemoryIngestionChunker"/>. The defaults are the chunker's behaviour before batch 12.</summary>
+/// <param name="MaxChunkLength">The longest chunk, in characters (default 480). A row of a table longer than this is a chunk on its own.</param>
+/// <param name="RecogniseTables">Cut Markdown tables and delimited blocks on row boundaries. A Markdown table repeats its header and separator row in
+/// each piece; a block without a separator row repeats nothing. On by default:
+/// the quality gate's numbers do not change on any backend, and rows are no longer cut in half (docs/design/memory.md).</param>
+/// <param name="FillIndexText">Fill <see cref="MemoryChunk.IndexText"/> with the title, the summary and the content. Off by default: on the
+/// quality corpus a title moved one VectorData result to the wrong record (docs/design/memory.md).</param>
+public sealed record DefaultMemoryChunkerOptions(int MaxChunkLength = 480, bool RecogniseTables = true, bool FillIndexText = false);
+
 public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
 {
     private static readonly Regex ParagraphSplitRegex = new(@"\r?\n\s*\r?\n", RegexOptions.Compiled);
     private static readonly Regex SentenceSplitRegex = new(@"(?<=[.!?])\s+", RegexOptions.Compiled);
     private static readonly Regex ChatTurnSplitRegex = new(@"\r?\n(?=(?:Sender:|Author:|Actor:|Coordinator:|Invoker:|Reporter:|Message:|Question:|Answer:))", RegexOptions.Compiled);
-    private const int MaxChunkLength = 480;
+    private static readonly Regex MarkdownSeparatorRegex = new(@"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$", RegexOptions.Compiled);
+    private readonly int _maxChunkLength;
+    private readonly bool _recogniseTables;
+    private readonly bool _fillIndexText;
+
+    /// <summary>Options: the chunk limit (default 480), table recognition (on) and index text (off). See <see cref="DefaultMemoryChunkerOptions"/>.</summary>
+    public DefaultMemoryIngestionChunker(DefaultMemoryChunkerOptions? options = null)
+    {
+        var chosen = options ?? new DefaultMemoryChunkerOptions();
+        ArgumentOutOfRangeException.ThrowIfLessThan(chosen.MaxChunkLength, 40);
+        _maxChunkLength = chosen.MaxChunkLength;
+        _recogniseTables = chosen.RecogniseTables;
+        _fillIndexText = chosen.FillIndexText;
+    }
+
+    private sealed record TextPiece(string Content, IReadOnlyList<string>? Tags = null);
+    private sealed record TableBlock(IReadOnlyList<string> Header, IReadOnlyList<string> Rows);
+    private sealed record TextBlock(string Text, TableBlock? Table);
     private sealed record ChunkSegment(string Content, MemoryChunkKind? KindHint = null, IReadOnlyList<string>? SegmentTags = null);
 
     public Task<IReadOnlyList<MemoryChunk>> ChunkAsync(MemoryNormalizedEnvelope envelope, string parentRecordId, CancellationToken cancellationToken = default)
@@ -66,22 +94,24 @@ public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
 
         var chunks = new List<MemoryChunk>();
         var ordinal = 0;
+        var tableNumber = 0;
 
         foreach (var segment in BuildSegments(envelope, content))
         {
-            foreach (var chunkContent in ChunkParagraphBySentence(segment.Content))
+            foreach (var piece in ChunkText(segment.Content, ref tableNumber))
             {
-                var chunkKind = ResolveChunkKind(envelope, chunkContent, segment.KindHint);
-                var tags = BuildChunkTags(envelope, chunkKind, segment.SegmentTags);
+                var chunkKind = ResolveChunkKind(envelope, piece.Content, segment.KindHint);
+                var tags = BuildChunkTags(envelope, chunkKind, MergeTags(segment.SegmentTags, piece.Tags));
 
                 chunks.Add(new MemoryChunk(
                     Id: $"chunk-{parentRecordId}-{ordinal}",
                     ParentRecordId: parentRecordId,
                     ChunkOrdinal: ordinal,
                     Kind: chunkKind,
-                    Content: chunkContent,
+                    Content: piece.Content,
                     Summary: envelope.Summary,
-                    Tags: tags));
+                    Tags: tags,
+                    IndexText: IndexTextFor(envelope, piece.Content)));
 
                 ordinal++;
             }
@@ -89,17 +119,163 @@ public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
 
         if (ShouldAddThreadSummaryChunk(envelope, chunks))
         {
+            var summaryContent = BuildThreadSummaryContent(envelope, chunks);
             chunks.Add(new MemoryChunk(
                 Id: $"chunk-{parentRecordId}-{ordinal}",
                 ParentRecordId: parentRecordId,
                 ChunkOrdinal: ordinal,
                 Kind: MemoryChunkKind.Summary,
-                Content: BuildThreadSummaryContent(envelope, chunks),
+                Content: summaryContent,
                 Summary: envelope.Summary,
-                Tags: BuildChunkTags(envelope, MemoryChunkKind.Summary, ["semantic.source:thread-summary"])));
+                Tags: BuildChunkTags(envelope, MemoryChunkKind.Summary, ["semantic.source:thread-summary"]),
+                IndexText: IndexTextFor(envelope, summaryContent)));
         }
 
         return Task.FromResult<IReadOnlyList<MemoryChunk>>(chunks);
+    }
+
+    /// <summary>
+    /// The chunk texts of one segment. Without table recognition this is the sentence split, as before. With it, a table block is cut on
+    /// row boundaries (see <see cref="TablePieces"/>) and the prose between tables goes through the sentence split.
+    /// </summary>
+    private List<TextPiece> ChunkText(string text, ref int tableNumber)
+    {
+        if (!_recogniseTables)
+            return ChunkParagraphBySentence(text).Select(static c => new TextPiece(c)).ToList();
+
+        var pieces = new List<TextPiece>();
+        foreach (var block in SplitTextBlocks(text))
+        {
+            if (block.Table is null)
+            {
+                pieces.AddRange(ChunkParagraphBySentence(block.Text).Select(static c => new TextPiece(c)));
+                continue;
+            }
+
+            tableNumber++;
+            pieces.AddRange(TablePieces(block.Table, tableNumber));
+        }
+
+        return pieces;
+    }
+
+    /// <summary>Cuts the text into prose and tables. Lines are split on newline and rejoined the same way, so prose is unchanged.</summary>
+    private static List<TextBlock> SplitTextBlocks(string text)
+    {
+        var lines = text.Split('\n');
+        var blocks = new List<TextBlock>();
+        var prose = new List<string>();
+        var i = 0;
+        while (i < lines.Length)
+        {
+            var run = TableRunLength(lines, i);
+            if (run == 0)
+            {
+                prose.Add(lines[i]);
+                i++;
+                continue;
+            }
+
+            if (prose.Count > 0)
+            {
+                blocks.Add(new TextBlock(string.Join("\n", prose), null));
+                prose.Clear();
+            }
+
+            var rows = lines[i..(i + run)];
+            // Only a Markdown table has a header to repeat: a header row followed by a separator row. Any other block repeats nothing.
+            var headerLength = rows.Length > 1 && MarkdownSeparatorRegex.IsMatch(rows[1]) ? 2 : 0;
+            blocks.Add(new TextBlock(string.Empty, new TableBlock(rows[..headerLength], rows[headerLength..])));
+            i += run;
+        }
+
+        if (prose.Count > 0)
+            blocks.Add(new TextBlock(string.Join("\n", prose), null));
+        return blocks;
+    }
+
+    /// <summary>The number of consecutive lines from <paramref name="start"/> with the same separators, when that is three or more; otherwise 0.
+    /// One line that looks like a table is not a table.</summary>
+    private static int TableRunLength(string[] lines, int start)
+    {
+        var shape = Separators(lines[start]);
+        if (shape.Count == 0)
+            return 0;
+
+        var length = 1;
+        while (start + length < lines.Length && Separators(lines[start + length]) == shape)
+            length++;
+        return length >= 3 ? length : 0;
+    }
+
+    /// <summary>The separators of a line: its tabs when it has any (one is enough), otherwise its pipes, which must be at least two. A line
+    /// with one pipe is prose, and a pipe block needs three columns.</summary>
+    private static (char Kind, int Count) Separators(string line)
+    {
+        var tabs = line.Count(static c => c == '\t');
+        if (tabs > 0)
+            return ('\t', tabs);
+        var pipes = line.Count(static c => c == '|');
+        return pipes >= 2 ? ('|', pipes) : ('\0', 0);
+    }
+
+    /// <summary>
+    /// The pieces of one table. A Markdown table repeats its header and separator row at the top of each piece. Any other block repeats
+    /// nothing, so each piece starts with its own first row, and a row appears in one piece only. Rows stay whole and in order, and each piece
+    /// is within the limit. A row that cannot share the limit with the header is a piece on its own, never cut. Each piece is tagged
+    /// table:n; the second and later pieces also carry continuation.
+    /// </summary>
+    private List<TextPiece> TablePieces(TableBlock table, int number)
+    {
+        var prefix = table.Header.Count == 0 ? string.Empty : string.Join("\n", table.Header) + "\n";
+        var texts = new List<string>();
+        var rows = new List<string>();
+        foreach (var row in table.Rows)
+        {
+            if (prefix.Length + row.Length > _maxChunkLength)
+            {
+                AddPiece(texts, prefix, rows);
+                texts.Add(row);
+                continue;
+            }
+
+            // The piece with this row added: the prefix, the rows, one newline before each row, and the new row.
+            var withRow = prefix.Length + rows.Sum(static r => r.Length) + rows.Count + row.Length;
+            if (rows.Count > 0 && withRow > _maxChunkLength)
+                AddPiece(texts, prefix, rows);
+            rows.Add(row);
+        }
+
+        AddPiece(texts, prefix, rows);
+
+        var tag = $"table:{number}";
+        return texts
+            .Select((text, index) => new TextPiece(text, index == 0 ? new[] { tag } : new[] { tag, "continuation" }))
+            .ToList();
+    }
+
+    private static void AddPiece(List<string> texts, string prefix, List<string> rows)
+    {
+        if (rows.Count == 0)
+            return;
+        texts.Add(prefix + string.Join("\n", rows));
+        rows.Clear();
+    }
+
+    private static IReadOnlyList<string>? MergeTags(IReadOnlyList<string>? segmentTags, IReadOnlyList<string>? pieceTags)
+    {
+        if (pieceTags is null)
+            return segmentTags;
+        return segmentTags is null ? pieceTags : [.. segmentTags, .. pieceTags];
+    }
+
+    /// <summary>The text that is embedded and keyword-indexed when FillIndexText is on: the title, then the summary, then the content.
+    /// Null otherwise, so the content is what is indexed.</summary>
+    private string? IndexTextFor(MemoryNormalizedEnvelope envelope, string text)
+    {
+        if (!_fillIndexText)
+            return null;
+        return string.Join("\n", new[] { envelope.Title, envelope.Summary, text }.Where(static part => !string.IsNullOrWhiteSpace(part)));
     }
 
     private static IEnumerable<ChunkSegment> BuildSegments(MemoryNormalizedEnvelope envelope, string content)
@@ -160,7 +336,7 @@ public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
             .Select(static p => p.Trim())
             .Where(static p => !string.IsNullOrWhiteSpace(p));
 
-    private static IEnumerable<string> ChunkParagraphBySentence(string paragraph)
+    private IEnumerable<string> ChunkParagraphBySentence(string paragraph)
     {
         var sentences = SentenceSplitRegex
             .Split(paragraph)
@@ -180,7 +356,7 @@ public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
 
         foreach (var sentence in sentences)
         {
-            if (sentence.Length > MaxChunkLength)
+            if (sentence.Length > _maxChunkLength)
             {
                 if (current.Length > 0)
                 {
@@ -195,7 +371,7 @@ public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
             }
 
             var additionalLength = current.Length == 0 ? sentence.Length : sentence.Length + 1;
-            if (current.Length > 0 && current.Length + additionalLength > MaxChunkLength)
+            if (current.Length > 0 && current.Length + additionalLength > _maxChunkLength)
             {
                 yield return current.ToString();
                 current.Clear();
@@ -211,12 +387,12 @@ public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
             yield return current.ToString();
     }
 
-    private static IEnumerable<string> HardChunk(string text)
+    private IEnumerable<string> HardChunk(string text)
     {
         var normalized = text.Trim();
-        for (var i = 0; i < normalized.Length; i += MaxChunkLength)
+        for (var i = 0; i < normalized.Length; i += _maxChunkLength)
         {
-            var length = Math.Min(MaxChunkLength, normalized.Length - i);
+            var length = Math.Min(_maxChunkLength, normalized.Length - i);
             yield return normalized.Substring(i, length).Trim();
         }
     }
@@ -282,7 +458,7 @@ public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
            && !string.IsNullOrWhiteSpace(envelope.ThreadRootExternalId)
            && chunks.Count >= 4;
 
-    private static string BuildThreadSummaryContent(MemoryNormalizedEnvelope envelope, IReadOnlyList<MemoryChunk> chunks)
+    private string BuildThreadSummaryContent(MemoryNormalizedEnvelope envelope, IReadOnlyList<MemoryChunk> chunks)
     {
         if (!string.IsNullOrWhiteSpace(envelope.Summary))
             return $"ThreadSummary: {envelope.Summary}";
@@ -293,8 +469,8 @@ public sealed class DefaultMemoryIngestionChunker : IMemoryIngestionChunker
             .Select(static c => c.Content)
             .Where(static c => !string.IsNullOrWhiteSpace(c)));
 
-        if (preview.Length > MaxChunkLength)
-            preview = preview[..MaxChunkLength].TrimEnd() + "…";
+        if (preview.Length > _maxChunkLength)
+            preview = preview[.._maxChunkLength].TrimEnd() + "…";
 
         return string.IsNullOrWhiteSpace(preview)
             ? "ThreadSummary: Conversation thread summary unavailable."

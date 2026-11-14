@@ -184,7 +184,9 @@ public sealed record MemoryChunk(
     string? WindowText = null,
     string? Summary = null,
     MemoryEmbeddingRef? Embedding = null,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null,
+    // What is embedded and keyword-indexed when it is set. Content stays what is stored and shown; null means index Content.
+    string? IndexText = null);
 
 public sealed record MemoryEntity(
     string Id,

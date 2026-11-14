@@ -264,6 +264,45 @@ grouped by LongMemEval's five abilities plus permission and trust. Results are c
 compares skill versions: per scenario, newly failing first. A backend ships when it passes conformance and stays within the
 thresholds.
 
+### Chunking: tables and index text (batch 12)
+
+`DefaultMemoryIngestionChunker` takes `DefaultMemoryChunkerOptions(MaxChunkLength, RecogniseTables, FillIndexText)`:
+
+- **Chunk limit**: 480 characters, as before. Smaller values are allowed (40 at least) but are not the default: see the vector result below.
+- **Tables (on by default).** A table is a run of three or more consecutive lines with the same separators: one or more tabs per
+  line, or at least two pipes per line (three columns). One or two lines are not a table, and neither are three prose lines that each
+  hold one pipe. A Markdown table has a separator row (`| --- | --- |`) as its second line. Only such a table has a header: its header
+  and separator row are repeated at the top of each piece. Any other block (a headerless tab block, or pipe rows with no separator row)
+  repeats nothing: each piece starts with its own first row, and every row appears in exactly one piece. Rows are never cut; a row that
+  cannot share the limit with the header is a piece on its own. Pieces carry `table:<n>`, and from the second piece `continuation`.
+  Prose goes through the sentence split as before. Consequence: a tab block whose first line is a header but which has no separator
+  row is headerless, so that line is treated as a row.
+- **Index text (off by default)**: `MemoryChunk.IndexText` (null by default) is the title, then the summary, then the content.
+  Backends that use it say so with `MemoryBackendCapabilities.UsesIndexText`: the in-memory and VectorData backends do. The SQLite and
+  files backends index the content and ignore it (open: ingestion ideas, D1 step 1). The conformance check "index text is searched
+  and the content is shown" runs only for backends that declare it.
+- **Embedder contract**: an embedder embeds the index text when it is set, otherwise the content, never a metadata value.
+
+Measured with `MemoryQualityGate` (scenarios and corpus: `MemoryQualityCorpus`; the table cases were added in batch 12):
+
+| Run | Corpus | Chunker | Result on the five backends |
+|---|---|---|---|
+| Before batch 12 | original 13 records, 10 scenarios | original | all pass; recall 1.000, MRR 1.000 on every scenario |
+| After (defaults) | same | new defaults | all pass; recall and MRR as before. The returned lists are not identical from run to run: `vectordata-inmemory` orders tied low-score hits differently (the tail of its top 5 changes). The chunker is not on that path, so this predates batch 12 (open) |
+| Tables, index off (12b) | + 5 table records, 5 scenarios (the headerless vendor block and `headerless-middle-row` added in 12b) | tables on | all pass on all five backends; recall 1.000, MRR 1.000 on all 15 scenarios |
+| Tables, index on (re-measured after 12b) | same | tables on, index text on | `vectordata-inmemory` fails `tsv-row-renewal`: returns `asset-policy` (recall 0, MRR 0). The title "Laptop renewal policy" pulls the other record closer. Other backends unchanged |
+| Chunk limit 160 (re-measured after 12b) | same | limit 160 | `vectordata-inmemory` fails `abstention-unknown` and `permission-salary-sales` (returns `office-table`). It has no score threshold. Other backends unchanged |
+
+What this shows: the gate cannot see table handling, because each scenario has one answer record and the retriever still ranks
+it first. The table defect was seen in the chunks themselves: before, the office table was cut in the middle of a row
+(`| Porto | 18` / `| CC-213 | 2021 |`) and its second piece had no header. The test `ChunkerBatch12Tests` pins the new behaviour.
+Decisions from the numbers: tables on by default (no number got worse); index text off by default (a regression on one
+backend); limit 480 kept (a smaller limit breaks abstention on the vector backend). Open, each with a box in the ingestion ideas
+document: (1) a score threshold for `VectorDataMemoryBackend` (`SqliteEmbeddingOptions.MinScore` exists only in the SQLite backend);
+until then a chunk limit below 480 breaks `abstention-unknown` and `permission-salary-sales` there; (2) index text in the SQLite and
+files backends; (3) a corpus hard enough for the gate to separate chunk-level changes, and an ordering that is stable between runs
+for tied scores in `vectordata-inmemory`.
+
 ### Filter before ranking
 
 Permissions applied after taking the top results make recall depend on how many forbidden records rank above the allowed

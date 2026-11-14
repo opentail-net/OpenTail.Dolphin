@@ -36,6 +36,7 @@ public static class MemoryBackendConformance
             new("taint survives an update", true, () => TaintSurvivesUpdate(newBackend())),
             new("superseded is not returned as current", capabilities.TemporalValidity, () => SupersededNotCurrent(newBackend())),
             new("declared keyword search finds a keyword", keyword, () => KeywordFinds(newBackend())),
+            new("index text is searched and the content is shown", capabilities.UsesIndexText, () => IndexTextSearchedAndContentShown(newBackend())),
         ];
     }
 
@@ -211,6 +212,21 @@ public static class MemoryBackendConformance
         var all = await Find(backend, "office opening hours", new MemoryFilter(IncludeSuperseded: true)).ConfigureAwait(false);
         Require(current.SequenceEqual(["new"]), $"expected only the current record, found [{string.Join(", ", current)}]");
         Require(all.Contains("old"), "a superseded record could not be found when asked for");
+    }
+
+    /// <summary>A backend that declares UsesIndexText finds a chunk by its IndexText, and a hit shows the Content, never the index text.</summary>
+    private static async Task IndexTextSearchedAndContentShown(IMemoryBackend backend)
+    {
+        const string shown = "The warehouse rota is posted on the wall.";
+        await backend.UpsertAsync(Record("indexed", shown),
+            [new MemoryChunk("indexed#0", "indexed", 0, MemoryChunkKind.RawEvidence, shown, IndexText: "zebrafinch rota keyword")]).ConfigureAwait(false);
+
+        var kind = backend.Capabilities.Search.HasFlag(MemorySearchKinds.Hybrid) ? MemorySearchKinds.Hybrid
+            : backend.Capabilities.Search.HasFlag(MemorySearchKinds.Keyword) ? MemorySearchKinds.Keyword : MemorySearchKinds.Vector;
+        var hits = await backend.SearchAsync(new MemorySearch("zebrafinch", kind, 10, new MemoryFilter())).ConfigureAwait(false);
+
+        Require(hits.Any(static h => h.Record.Id == "indexed"), "the index text was not searched");
+        Require(hits.All(h => h.Text == shown), "a hit showed the index text instead of the content");
     }
 
     private static async Task KeywordFinds(IMemoryBackend backend)

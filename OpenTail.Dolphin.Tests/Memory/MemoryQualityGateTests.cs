@@ -38,6 +38,20 @@ public sealed class MemoryQualityGateTests
         Assert.All(report.Cases, static c => Assert.Equal(0, c.Leaks + c.UntrustedAsFact + c.SupersededAsCurrent));
     }
 
+    // Batch 12: the table cases, with their chunks made by the default chunker (tables recognised), pass on every backend.
+    [Theory]
+    [MemberData(nameof(Backends))]
+    public async Task The_table_cases_pass_the_gate_when_their_chunks_come_from_the_chunker(string backend)
+    {
+        var corpus = await MemoryQualityCorpus.RecordsWithTablesAsync(new DefaultMemoryIngestionChunker());
+
+        var report = await MemoryQualityGate.RunAsync(backend, New(backend), corpus, MemoryQualityCorpus.ScenariosWithTables, time: Clock);
+
+        var failures = report.Cases.Where(static c => !c.Passed)
+            .Select(static c => $"{c.ScenarioId}: recall={c.RecallAtK:0.00} mrr={c.Mrr:0.00} returned=[{string.Join(", ", c.ReturnedIds)}] {string.Join("; ", c.Notes)}");
+        Assert.True(report.Passed, string.Join(Environment.NewLine, failures));
+    }
+
     [Fact]
     public async Task Sqlite_with_vectors_loses_no_scenario_that_keyword_only_sqlite_passes()
     {

@@ -150,7 +150,8 @@ public sealed class VectorDataMemoryBackend : IMemoryBackend
             FiltersBeforeRanking: true,
             TemporalValidity: true,
             DeleteBySource: true,
-            EmbeddingModelId: embeddingModelId);
+            EmbeddingModelId: embeddingModelId,
+            UsesIndexText: true);
     }
 
     public MemoryBackendCapabilities Capabilities { get; }
@@ -163,14 +164,15 @@ public sealed class VectorDataMemoryBackend : IMemoryBackend
             throw new ArgumentException("Every chunk must belong to the record.", nameof(chunks));
 
         await _collection.EnsureCollectionExistsAsync(cancellationToken).ConfigureAwait(false);
-        IReadOnlyList<(string Id, MemoryChunkKind Kind, string Text)> parts = chunks.Count > 0
-            ? [.. chunks.Select(static c => (c.Id, c.Kind, c.Content))]
-            : [(record.Id, MemoryChunkKind.Unknown, record.Content)];
+        // Vectors come from IndexText when it is set. The row keeps Content, which is what a hit shows.
+        IReadOnlyList<(string Id, MemoryChunkKind Kind, string Text, string Indexed)> parts = chunks.Count > 0
+            ? [.. chunks.Select(static c => (c.Id, c.Kind, c.Content, c.IndexText ?? c.Content))]
+            : [(record.Id, MemoryChunkKind.Unknown, record.Content, record.Content)];
         // Below the page size, every page of this record's rows holds a stale one while any remain, so the cleanup ends.
         if (parts.Count >= _getLimit)
             throw new ArgumentException($"A record may have at most {_getLimit - 1} chunks.", nameof(chunks));
 
-        var vectors = await _embeddings.GenerateAsync(parts.Select(static p => p.Text), cancellationToken: cancellationToken).ConfigureAwait(false);
+        var vectors = await _embeddings.GenerateAsync(parts.Select(static p => p.Indexed), cancellationToken: cancellationToken).ConfigureAwait(false);
 
         var json = JsonSerializer.Serialize(record, Json);
         var rows = parts.Select((p, i) => Row(record, p.Id, p.Kind, p.Text, vectors[i].Vector, json)).ToList();

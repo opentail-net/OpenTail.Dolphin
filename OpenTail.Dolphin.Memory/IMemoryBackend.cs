@@ -19,12 +19,15 @@ public enum MemorySearchKinds
 /// <param name="TemporalValidity">Superseded records and facts outside their validity window are not returned as current.</param>
 /// <param name="EmbeddingModelId">The embedding model behind stored vectors, or null when the backend embeds itself or has none.
 /// Vectors from one model are useless to another: switching means a re-index from the records.</param>
+/// <param name="UsesIndexText">True when the backend embeds or keyword-indexes <see cref="MemoryChunk.IndexText"/> when it is set, and shows
+/// <see cref="MemoryChunk.Content"/>. False: it indexes the content and ignores IndexText, so an option that fills IndexText changes nothing there.</param>
 public sealed record MemoryBackendCapabilities(
     MemorySearchKinds Search,
     bool FiltersBeforeRanking,
     bool TemporalValidity,
     bool DeleteBySource,
-    string? EmbeddingModelId = null);
+    string? EmbeddingModelId = null,
+    bool UsesIndexText = false);
 
 /// <summary>Who is asking and what they may see. Every field is typed; nothing is inferred from record text.</summary>
 /// <param name="Principals">The caller's user, group and role ids, matched against a record's captured source ACL.</param>

@@ -279,6 +279,8 @@ Nothing is started. In order, with the corrections of section 9 applied. Tick a 
   - [ ] Each connector that sees a 401 or 403 throws it. **Partly, batch 11b:** Google Drive (a 401 after one more attempt with a fresh
     token; a 403 that names insufficient permissions) and Graph Drive (a 401 after one fresh token and one fresh download link; a 403 only
     when Graph names `InvalidAuthenticationToken` or `Authorization_RequestDenied`; any other 403 is one item, an ordinary failure).
+    **Not verified (to check against Microsoft's error documentation):** that those two error codes are the token-level refusals the
+    rule names; they come from the connector's author, not from a read of the documentation.
     One open box per connector not yet changed (the object-store clients are shared with the exporters, so the call site must decide):
     - [ ] Azure Blob object-store client (`AzureBlobObjectStoreClient`)
     - [ ] S3 object-store client (`S3ObjectStoreClient`)
@@ -312,7 +314,9 @@ Nothing is started. In order, with the corrections of section 9 applied. Tick a 
   - [x] `IConnectionCheck` and `ConnectionCheckResult` (with `ConnectionCheckStatus`, A2's kinds).
   - [ ] Implement on the connectors that take a credential (owner question 1). **Partly:** Google Drive (one read of the account, no
     throttling retry, one fresh token on 401) and Graph Drive (one read of the configured drive, one fresh token on 401; other target
-    kinds go through the connector's own resolution, which may retry throttling). Owner question 1 is still open. One open box per
+    kinds go through the connector's own resolution, which may retry throttling). **Not verified:** whether the credential returns a new
+    token after a 401. The connector clears its own cache and asks the credential again; whether that is a new token depends on the
+    credential's cache, and Azure.Identity's behaviour was not read in source. Owner question 1 is still open. One open box per
     connector not yet covered, in the same order as under A2:
     - [ ] Azure Blob object-store client (`AzureBlobObjectStoreClient`)
     - [ ] S3 object-store client (`S3ObjectStoreClient`)
@@ -339,11 +343,26 @@ Nothing is started. In order, with the corrections of section 9 applied. Tick a 
 
 **Then: retrieval quality, each measured with the quality gate before it is turned on**
 
-- [ ] Make the default chunk limit (480 characters) an option.
-- [ ] **B2. Tables** in `DefaultMemoryIngestionChunker`: recognise a table, cut on rows, repeat the header, tag the pieces.
-- [ ] **D1, step 1.** Title and summary in front of the indexed text. Needs an optional index-text field on `MemoryChunk`.
+- [x] Make the default chunk limit (480 characters) an option. **Batch 12:** `DefaultMemoryChunkerOptions.MaxChunkLength`, default 480.
+  Not changed by default: a limit of 160 breaks abstention on `VectorDataMemoryBackend` (memory design, "Chunking").
+- [x] **B2. Tables.** **Batch 12, corrected in 12b:** `RecogniseTables`, on by default. A table is three or more lines with the same
+  tab count, or two or more pipes each. Rows are not cut. A Markdown table repeats its header and separator row; a block without a
+  separator row repeats nothing. Pieces carry `table:<n>` and `continuation`. Tests: `ChunkerBatch12Tests`. **Not visible on the gate:**
+  every scenario passed before and after. The gate has one answer record per scenario, so it cannot see inside a record. The defect
+  was measured in the chunks instead.
+- [x] **D1, step 1.** **Batch 12:** `MemoryChunk.IndexText`, filled by the chunker (title, summary, content) behind `FillIndexText`,
+  **off by default**. `MemoryBackendCapabilities.UsesIndexText` is true for the in-memory and VectorData backends and false for SQLite
+  and the files backend (which index content; a schema change would be needed). With the option on, VectorData fails one table scenario
+  (memory design, "Chunking"), which is why it stays off.
+  - [ ] Index text in the SQLite backend (`chunks.text` feeds the FTS index and is what a hit shows; a separate column needs a schema bump)
+    and in the files backend (it keeps records only).
 - [ ] **D1, step 2.** The `IChunkContextualizer` hook (owner question 2).
-- [ ] **C3.** One rule in the embedder's contract: embed content and index text, never metadata.
+- [ ] **Retrieval: a score threshold for VectorData.** `VectorDataMemoryBackend` has no minimum score, so it returns the nearest chunks
+  even when nothing is close. With the chunk limit at 160 it fails `abstention-unknown` and `permission-salary-sales` in the quality
+  corpus (it returns `office-table`). `SqliteEmbeddingOptions.MinScore` exists only in the SQLite backend.
+- [ ] **Retrieval: a stable order for tied scores.** `vectordata-inmemory`'s returned lists differ between two runs of the same gate
+  (the tail of the top five). Recall and MRR do not change. Found in batch 12b; the cause is not yet known.
+- [x] **C3.** **Batch 12:** the embedder contract (`IMemoryIngestionEmbedder`) says: embed the index text when set, otherwise the content, never a metadata value.
 
 **With other work**
 

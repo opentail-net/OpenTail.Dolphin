@@ -16,7 +16,8 @@ public sealed class InMemoryMemoryBackend : IMemoryBackend
         Search: MemorySearchKinds.Keyword,
         FiltersBeforeRanking: true,
         TemporalValidity: true,
-        DeleteBySource: true);
+        DeleteBySource: true,
+        UsesIndexText: true);
 
     public Task UpsertAsync(MemoryRecord record, IReadOnlyList<MemoryChunk> chunks, CancellationToken cancellationToken = default)
     {
@@ -64,9 +65,9 @@ public sealed class InMemoryMemoryBackend : IMemoryBackend
             hits = [.. _records.Values
                 .Where(e => MemoryGovernance.Deny(e.Record, search.Filter, now) is null)
                 .SelectMany(e => e.Chunks.Count > 0
-                    ? e.Chunks.Select(c => (e.Record, c.Id, c.Kind, Text: c.Content))
-                    : [(e.Record, e.Record.Id, MemoryChunkKind.Unknown, Text: e.Record.Content)])
-                .Select(x => (x.Record, x.Id, x.Kind, x.Text, Score: Overlap(terms, x.Text)))
+                    ? e.Chunks.Select(c => (e.Record, c.Id, c.Kind, Text: c.Content, Indexed: c.IndexText ?? c.Content))
+                    : [(e.Record, e.Record.Id, MemoryChunkKind.Unknown, Text: e.Record.Content, Indexed: e.Record.Content)])
+                .Select(x => (x.Record, x.Id, x.Kind, x.Text, Score: Overlap(terms, x.Indexed)))
                 .Where(x => x.Score > 0)
                 .OrderByDescending(x => x.Score)
                 .ThenBy(x => x.Record.Id, StringComparer.Ordinal)
