@@ -57,6 +57,13 @@ Guidelines, taken from the existing connectors:
 - Take an allow-list of fields or columns rather than reading everything (see `CsvConnectorConfig` and the Sql connector).
 - Pair the connector with an `ITextExtractor` that understands the bytes you return. For structured sources such as CSV rows,
   the package supplies its own extractor (for example `CsvRowTextExtractor`).
+- Report failures by kind (ingestion-ideas A2). Throw `SourceConfigurationException` when the source refuses the sign-in itself
+  (a 401 that stays after one fresh token, or a 403 that names the token or a missing scope or permission): the run stops, and the
+  operator is told to fix the configuration. A 403 on one item is an ordinary failure, not a refused sign-in. Before you throw, try
+  one fresh token: an access token can expire mid-run. Do not throw it for throttling (429, or a provider's quota error): that is an
+  ordinary failed item and is retried. For any other failure throw an ordinary exception with the reason; it is put on the retry list.
+- If the source can check its credential cheaply, implement `IConnectionCheck`: one read-only request, answered at once, with the
+  kinds of `ConnectionCheckStatus`.
 
 ## Write a new exporter
 

@@ -271,20 +271,70 @@ Nothing is started. In order, with the corrections of section 9 applied. Tick a 
 
 **First: what an operator sees when a credential breaks**
 
-- [ ] **A2. Failure kinds.**
-  - [ ] `SourceConfigurationException` in `Files`.
-  - [ ] The pipeline stops the run on it, in the fetch branch and from the change stream; nothing goes on the retry list.
-  - [ ] `IngestionReport` says the run stopped on a configuration failure.
-  - [ ] Each connector that sees a 401 or 403 throws it.
-  - [ ] Pass the error text to `TrackRetry` directly.
-  - [ ] Tests: a revoked credential stops the run and leaves the cursor and the retry list as they were.
-- [ ] **B4. Type mismatch in the main pipeline** (goes with A2).
-  - [ ] A warnings list on `TextExtractionResult`; `TransformationsTextExtractor` passes the library's warnings through.
-  - [ ] The pipeline records a mismatch as a validation warning.
-- [ ] **A1. Connection check.**
-  - [ ] `IConnectionCheck` and `ConnectionCheckResult`, using A2's kinds.
-  - [ ] Implement on the connectors that take a credential (owner question 1).
-  - [ ] A conformance check.
+- [ ] **A2. Failure kinds.** Built in batch 11 except the two items marked open below.
+  - [x] `SourceConfigurationException` in `Files` (`Contracts/SourceConfigurationException.cs`).
+  - [x] The pipeline stops the run on it, in the fetch branch and from the change stream; nothing goes on the retry list
+    (`ConnectivityPipeline`: the fetch branch rethrows, the retry loop and the stream are wrapped, `holdCommits` stops the save).
+  - [x] `IngestionReport.ConfigurationFailure` says the run stopped on a configuration failure (a field of its own, plus an error line).
+  - [ ] Each connector that sees a 401 or 403 throws it. **Partly, batch 11b:** Google Drive (a 401 after one more attempt with a fresh
+    token; a 403 that names insufficient permissions) and Graph Drive (a 401 after one fresh token and one fresh download link; a 403 only
+    when Graph names `InvalidAuthenticationToken` or `Authorization_RequestDenied`; any other 403 is one item, an ordinary failure).
+    One open box per connector not yet changed (the object-store clients are shared with the exporters, so the call site must decide):
+    - [ ] Azure Blob object-store client (`AzureBlobObjectStoreClient`)
+    - [ ] S3 object-store client (`S3ObjectStoreClient`)
+    - [ ] GCS object-store client (`GcsObjectStoreClient`)
+    - [ ] Box object-store client (`BoxObjectStoreClient`)
+    - [ ] WebDav object-store client (`WebDavObjectStoreClient`)
+    - [ ] SFTP object-store client (`SftpObjectStoreClient`)
+    - [ ] Dropbox object-store client (`DropboxObjectStoreClient`)
+    - [ ] Dropbox connector (`DropboxConnector`)
+    - [ ] YouTube connector (`YouTubeConnector`)
+    - [ ] Reddit connector (`RedditConnector`)
+    - [ ] Meta connector (`MetaConnector`)
+    - [ ] Twitter connector (`TwitterConnector`)
+    - [ ] RSS feed connector (`RssFeedConnector`)
+    - [ ] Site crawl connector (`SiteCrawlConnector`)
+    - [ ] Gmail inbox adapter (`GmailInboxAdapter`)
+    - [ ] Graph inbox adapter (`GraphInboxAdapter`)
+    - [ ] IMAP inbox adapter (`ImapInboxAdapter`)
+  - [ ] Pass the error text to `TrackRetry` directly. **Not done:** the configuration path does not call `TrackRetry`; `TrackRetry`
+    still reads the last error line, which is right for the ordinary failure path (section 9).
+  - [x] Tests: a refused fetch and a refused stream stop the run and leave the cursor and the retry list where they were
+    (`ConfigurationStopTests`); a throttling answer is not one (`ConfigurationStopTests`).
+- [x] **B4. Type mismatch in the main pipeline** (goes with A2). Built in batch 11.
+  - [x] A warnings list on `TextExtractionResult` (`Warnings`, optional); `TransformationsTextExtractor` passes the library's warnings
+    through, with the library's content-type mismatch under Dolphin's own code.
+  - [x] The pipeline records a mismatch as a validation warning, `CONTENT_TYPE_MISMATCH`. Tests: `ExtractionWarningTests`. **Not
+    reproduced end to end:** the library reports a mismatch only after a successful read, and the repository has no fixture of another
+    type; the mapping is tested with the library's own warning type.
+- [ ] **A1. Connection check.** Built in batch 11 for two connectors; batch 11b added Graph's check tests, a fresh token on 401 for both,
+  and redaction of check messages.
+  - [x] `IConnectionCheck` and `ConnectionCheckResult` (with `ConnectionCheckStatus`, A2's kinds).
+  - [ ] Implement on the connectors that take a credential (owner question 1). **Partly:** Google Drive (one read of the account, no
+    throttling retry, one fresh token on 401) and Graph Drive (one read of the configured drive, one fresh token on 401; other target
+    kinds go through the connector's own resolution, which may retry throttling). Owner question 1 is still open. One open box per
+    connector not yet covered, in the same order as under A2:
+    - [ ] Azure Blob object-store client (`AzureBlobObjectStoreClient`)
+    - [ ] S3 object-store client (`S3ObjectStoreClient`)
+    - [ ] GCS object-store client (`GcsObjectStoreClient`)
+    - [ ] Box object-store client (`BoxObjectStoreClient`)
+    - [ ] WebDav object-store client (`WebDavObjectStoreClient`)
+    - [ ] SFTP object-store client (`SftpObjectStoreClient`)
+    - [ ] Dropbox object-store client (`DropboxObjectStoreClient`)
+    - [ ] Dropbox connector (`DropboxConnector`)
+    - [ ] YouTube connector (`YouTubeConnector`)
+    - [ ] Reddit connector (`RedditConnector`)
+    - [ ] Meta connector (`MetaConnector`)
+    - [ ] Twitter connector (`TwitterConnector`)
+    - [ ] RSS feed connector (`RssFeedConnector`)
+    - [ ] Site crawl connector (`SiteCrawlConnector`)
+    - [ ] Gmail inbox adapter (`GmailInboxAdapter`)
+    - [ ] Graph inbox adapter (`GraphInboxAdapter`)
+    - [ ] IMAP inbox adapter (`ImapInboxAdapter`)
+  - [x] A conformance check: check 10 in `SourceConnectorConformance` runs for a connector that implements the interface. The read-only
+    requests are tested in `ConnectionCheckTests` (Google) and `GraphRefusalTests` (Graph).
+  - [x] Check messages pass through `CredentialRedactor` (Google and Graph), including a failure in the token-info step (Google); tested
+    with a bearer token in `GraphRefusalTests` and `GoogleRefusalTests`.
   - [ ] Orca calls it from `--lint` and at startup (Orca's repository).
 
 **Then: retrieval quality, each measured with the quality gate before it is turned on**

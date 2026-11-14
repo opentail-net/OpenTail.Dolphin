@@ -163,6 +163,14 @@ public static class SourceConnectorConformance
                 "Check 9 failed: discovery over a source that fails part way ended like a complete one.");
         }
 
+        // Check 10 (A1): a connector that implements IConnectionCheck answers it with a result of a known kind, and does not throw. Which requests
+        // it makes are checked by its own tests (read-only, one request); its method names by check 5.
+        if (skipped?.Contains(10) != true && connector1 is IConnectionCheck connectionCheck)
+        {
+            var answer = await connectionCheck.CheckConnectionAsync(ct).ConfigureAwait(false);
+            Require(answer is not null && Enum.IsDefined(answer.Status), "Check 10 failed: the connection check returned no result of a known kind.");
+        }
+
         // Check 3: FetchAsync of a discovered item succeeds. After RemoveOneItemAsync, fetching that item returns empty bytes or throws an ordinary exception within 10 seconds, never hangs. Use a timeout.
         string? removedExceptionMessage = null;
         if (skipped?.Contains(3) != true)

@@ -37,25 +37,35 @@ public sealed class ConnectivityPipeline
             ? new SourceRefCollector(sync.MaxReportedRefs, run.Issues, subject: null)
             : null;
         var discoveryCompleted = true;
-        await foreach (var item in _source.DiscoverAsync(cancellationToken))
+        try
         {
-            if (run.CapReached)
+            await foreach (var item in _source.DiscoverAsync(cancellationToken))
             {
-                feedback?.NotProcessed(item); // discovered, but the cap stopped the run before it
-                discoveryCompleted = false;
-                break;
-            }
+                if (run.CapReached)
+                {
+                    feedback?.NotProcessed(item); // discovered, but the cap stopped the run before it
+                    discoveryCompleted = false;
+                    break;
+                }
 
-            run.Discovered++;
-            sourceRefs?.Add(item.Id);
-            var outcome = await ProcessAsync(item, run, exporterFailuresStop: false, sourceRefs, cancellationToken);
-            if (outcome is Outcome.Rejected or Outcome.FetchFailed or Outcome.ExporterFailed or Outcome.ExportedSomeRejected) feedback?.NotProcessed(item);
-            if (outcome == Outcome.ExporterFailed) discoveryCompleted = false;
-            if (run.CapReached)
-            {
-                discoveryCompleted = false;
-                break;
+                run.Discovered++;
+                sourceRefs?.Add(item.Id);
+                var outcome = await ProcessAsync(item, run, exporterFailuresStop: false, sourceRefs, cancellationToken);
+                if (outcome is Outcome.Rejected or Outcome.FetchFailed or Outcome.ExporterFailed or Outcome.ExportedSomeRejected) feedback?.NotProcessed(item);
+                if (outcome == Outcome.ExporterFailed) discoveryCompleted = false;
+                if (run.CapReached)
+                {
+                    discoveryCompleted = false;
+                    break;
+                }
             }
+        }
+        catch (SourceConfigurationException ex)
+        {
+            // A2: the source refused its credential. The run stops here; nothing is retried, and the report says why.
+            run.ConfigurationFailure = ex.Message;
+            discoveryCompleted = false;
+            run.Errors.Add($"The run stopped: the source refused its configuration. {ex.Message}");
         }
 
         if (_source is IReportsIncompleteDiscovery { IncompleteReason: { } incomplete } && !cancellationToken.IsCancellationRequested)
@@ -186,136 +196,148 @@ public sealed class ConnectivityPipeline
         // Items that failed in earlier runs go first: the cursor has already moved past them.
         // An item that failed after the last committed checkpoint is on the list and will also come again from the stream; it is
         // fetched once per run, by whichever reaches it first.
-        var retriedThisRun = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var entry in retries.ToList())
+        try
         {
-            if (run.CapReached)
+            var retriedThisRun = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entry in retries.ToList())
             {
-                stoppedByCap = true;
-                goto stop;
+                if (run.CapReached)
+                {
+                    stoppedByCap = true;
+                    goto stop;
+                }
+
+                retriedThisRun.Add(entry.Item.Id);
+                // No refs here: the item comes again from a full run's stream, which adds them.
+                var retried = await ProcessAsync(entry.Item, run, exporterFailuresStop: true, sourceRefs: null, ct);
+                unflushed |= NeedsFlush(retried);
+                if (retried == Outcome.FetchFailed)
+                    TrackRetry(entry.Item); // the list already holds it, so this never fails
+                else
+                    Untrack(entry.Item.Id);
             }
 
-            retriedThisRun.Add(entry.Item.Id);
-            // No refs here: the item comes again from a full run's stream, which adds them.
-            var retried = await ProcessAsync(entry.Item, run, exporterFailuresStop: true, sourceRefs: null, ct);
-            unflushed |= NeedsFlush(retried);
-            if (retried == Outcome.FetchFailed)
-                TrackRetry(entry.Item); // the list already holds it, so this never fails
-            else
-                Untrack(entry.Item.Id);
-        }
-
-        await foreach (var change in source.GetChangesAsync(committedCursor, ct))
-        {
-            switch (change)
+            await foreach (var change in source.GetChangesAsync(committedCursor, ct))
             {
-                case SourceChange.Upsert upsert:
-                    if (run.CapReached)
-                    {
-                        stoppedByCap = true;
-                        goto stop;
-                    }
-                    run.Discovered++;
-                    sinceCommit++;
-                    if (run.FullRun) sourceRefs?.Add(upsert.Item.Id);
-                    if (retriedThisRun.Contains(upsert.Item.Id))
-                    {
-                        run.Skipped++; // the retry pass already fetched its current content this run
-                        if (run.FullRun && sourceRefs is not null)
+                switch (change)
+                {
+                    case SourceChange.Upsert upsert:
+                        if (run.CapReached)
                         {
-                            // The retry pass ran without a source-ref collector, so revalidate before treating the item as accounted for.
-                            if (_options.Expander?.ValidateSourceId(upsert.Item) is { } sourceIdError)
+                            stoppedByCap = true;
+                            goto stop;
+                        }
+                        run.Discovered++;
+                        sinceCommit++;
+                        if (run.FullRun) sourceRefs?.Add(upsert.Item.Id);
+                        if (retriedThisRun.Contains(upsert.Item.Id))
+                        {
+                            run.Skipped++; // the retry pass already fetched its current content this run
+                            if (run.FullRun && sourceRefs is not null)
                             {
-                                sourceRefs.Remove(upsert.Item.Id);
-                                sourceRefs.MarkIncomplete(upsert.Item.Id,
-                                    "A previously retried source item was rejected because its ID conflicts with the expander's child-ID namespace.");
+                                // The retry pass ran without a source-ref collector, so revalidate before treating the item as accounted for.
+                                if (_options.Expander?.ValidateSourceId(upsert.Item) is { } sourceIdError)
+                                {
+                                    sourceRefs.Remove(upsert.Item.Id);
+                                    sourceRefs.MarkIncomplete(upsert.Item.Id,
+                                        "A previously retried source item was rejected because its ID conflicts with the expander's child-ID namespace.");
+                                }
+                                else if (run.ExpandedChildren.TryGetValue(upsert.Item.Id, out var children) && children is not null)
+                                    ArchiveRefs(upsert.Item.Id, children, sourceRefs);
+                                else if (run.ExpandedChildren.ContainsKey(upsert.Item.Id))
+                                    await ArchiveFailedAsync(upsert.Item, DocumentId(_sourceType, upsert.Item.TenantContext, upsert.Item.Id), run, sourceRefs, ct);
                             }
-                            else if (run.ExpandedChildren.TryGetValue(upsert.Item.Id, out var children) && children is not null)
-                                ArchiveRefs(upsert.Item.Id, children, sourceRefs);
-                            else if (run.ExpandedChildren.ContainsKey(upsert.Item.Id))
-                                await ArchiveFailedAsync(upsert.Item, DocumentId(_sourceType, upsert.Item.TenantContext, upsert.Item.Id), run, sourceRefs, ct);
+                            break;
+                        }
+
+                        var outcome = await ProcessAsync(upsert.Item, run, exporterFailuresStop: true, run.FullRun ? sourceRefs : null, ct);
+                        unflushed |= NeedsFlush(outcome);
+                        if (outcome == Outcome.FetchFailed)
+                        {
+                            if (!TrackRetry(upsert.Item))
+                            {
+                                holdCommits = true;
+                                run.Errors.Add($"{upsert.Item.DisplayName}: the retry list is full, so nothing is committed past this item; the next run starts again from the last commit.");
+                            }
+                        }
+                        else
+                        {
+                            Untrack(upsert.Item.Id); // the feed brought it again and it went through
                         }
                         break;
-                    }
 
-                    var outcome = await ProcessAsync(upsert.Item, run, exporterFailuresStop: true, run.FullRun ? sourceRefs : null, ct);
-                    unflushed |= NeedsFlush(outcome);
-                    if (outcome == Outcome.FetchFailed)
-                    {
-                        if (!TrackRetry(upsert.Item))
+                    case SourceChange.Delete d:
+                        if (run.CapReached)
                         {
+                            stoppedByCap = true;
+                            goto stop;
+                        }
+                        sinceCommit++;
+                        var tenant = d.TenantContext ?? (run.TenantContext.Length > 0 ? run.TenantContext : null);
+                        if (tenant is null)
+                        {
+                            // Without the tenant the document id is unknown, and a deletion under the wrong id would silently do nothing.
+                            run.Failed++;
+                            run.Errors.Add($"{d.SourceRef}: a deletion came before any item and without a tenant, so nothing is committed past it.");
                             holdCommits = true;
-                            run.Errors.Add($"{upsert.Item.DisplayName}: the retry list is full, so nothing is committed past this item; the next run starts again from the last commit.");
+                            break;
                         }
-                    }
-                    else
-                    {
-                        Untrack(upsert.Item.Id); // the feed brought it again and it went through
-                    }
-                    break;
 
-                case SourceChange.Delete d:
-                    if (run.CapReached)
-                    {
-                        stoppedByCap = true;
-                        goto stop;
-                    }
-                    sinceCommit++;
-                    var tenant = d.TenantContext ?? (run.TenantContext.Length > 0 ? run.TenantContext : null);
-                    if (tenant is null)
-                    {
-                        // Without the tenant the document id is unknown, and a deletion under the wrong id would silently do nothing.
-                        run.Failed++;
-                        run.Errors.Add($"{d.SourceRef}: a deletion came before any item and without a tenant, so nothing is committed past it.");
-                        holdCommits = true;
-                        break;
-                    }
-
-                    Untrack(d.SourceRef);
-                    try
-                    {
-                        // An expanded archive was never a document itself, but its entries are.
-                        var parentId = DocumentId(_sourceType, tenant, d.SourceRef);
-                        if (_options.Expander is not null && _options.VersionStore is { } manifests
-                            && await manifests.GetAsync(ManifestKey(parentId), ct) is { } manifest)
+                        Untrack(d.SourceRef);
+                        try
                         {
-                            if (ReadManifestOrNull(manifest) is { } children)
-                                foreach (var child in children)
-                                    await DeleteDocumentAsync(child, tenant, d.Reason, run, ct);
-                            else
-                                ManifestDamaged(run, d.SourceRef);
-                            await manifests.RemoveAsync(ManifestKey(parentId), ct);
+                            // An expanded archive was never a document itself, but its entries are.
+                            var parentId = DocumentId(_sourceType, tenant, d.SourceRef);
+                            if (_options.Expander is not null && _options.VersionStore is { } manifests
+                                && await manifests.GetAsync(ManifestKey(parentId), ct) is { } manifest)
+                            {
+                                if (ReadManifestOrNull(manifest) is { } children)
+                                    foreach (var child in children)
+                                        await DeleteDocumentAsync(child, tenant, d.Reason, run, ct);
+                                else
+                                    ManifestDamaged(run, d.SourceRef);
+                                await manifests.RemoveAsync(ManifestKey(parentId), ct);
+                            }
+
+                            await DeleteDocumentAsync(d.SourceRef, tenant, d.Reason, run, ct);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            run.Failed++;
+                            run.Errors.Add($"{d.SourceRef}: {ex.Message}");
+                            return run.Report();
                         }
 
-                        await DeleteDocumentAsync(d.SourceRef, tenant, d.Reason, run, ct);
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        run.Failed++;
-                        run.Errors.Add($"{d.SourceRef}: {ex.Message}");
-                        return run.Report();
-                    }
+                        unflushed = true;
+                        break;
 
-                    unflushed = true;
-                    break;
+                    case SourceChange.Checkpoint checkpoint:
+                        pending = checkpoint.Cursor;
+                        if (sinceCommit >= Math.Max(1, sync.CheckpointEveryItems) || DateTimeOffset.UtcNow - lastCommit >= every)
+                            await CommitAsync();
+                        break;
 
-                case SourceChange.Checkpoint checkpoint:
-                    pending = checkpoint.Cursor;
-                    if (sinceCommit >= Math.Max(1, sync.CheckpointEveryItems) || DateTimeOffset.UtcNow - lastCommit >= every)
-                        await CommitAsync();
-                    break;
-
-                case SourceChange.Reset reset:
-                    run.FullRun = true;
-                    if (retries.Count > 0)
-                    {
-                        retries.Clear(); // a full listing follows, which brings every item that still exists
-                        retriesDirty = true;
-                    }
-                    sourceRefs?.Reset();
-                    run.Issues.Add(new ValidationIssue(ValidationSeverity.Warning, "SYNC_RESET", "Full run: " + reset.Reason, scope));
-                    break;
+                    case SourceChange.Reset reset:
+                        run.FullRun = true;
+                        if (retries.Count > 0)
+                        {
+                            retries.Clear(); // a full listing follows, which brings every item that still exists
+                            retriesDirty = true;
+                        }
+                        sourceRefs?.Reset();
+                        run.Issues.Add(new ValidationIssue(ValidationSeverity.Warning, "SYNC_RESET", "Full run: " + reset.Reason, scope));
+                        break;
+                }
             }
+
+        }
+        catch (SourceConfigurationException ex)
+        {
+            // A2: the source refused its credential, in the fetch branch or the change stream. Nothing more is committed or retried: the
+            // cursor stays at the last commit and the retry list stays as the store has it. Exporters still flush what was exported.
+            holdCommits = true;
+            run.ConfigurationFailure = ex.Message;
+            run.Errors.Add($"The run stopped: the source refused its configuration. {ex.Message} Nothing was retried, and the cursor was not saved past the last commit.");
         }
 
     stop:
@@ -399,6 +421,10 @@ public sealed class ConnectivityPipeline
         catch (OperationCanceledException)
         {
             throw;
+        }
+        catch (SourceConfigurationException)
+        {
+            throw; // A2: not a failed item, so not a retry: the run stops, and the callers say so
         }
         catch (Exception ex)
         {
@@ -527,6 +553,12 @@ public sealed class ConnectivityPipeline
             run.Errors.Add($"{item.DisplayName}: {ex.Message}");
             return Outcome.Rejected;
         }
+        // B4: the extraction library found the content not to match its file type. The text is still used; the mismatch is recorded as a
+        // validation warning with its own code, so a reviewer can see it in the report.
+        foreach (var warning in extraction.Warnings ?? [])
+            if (warning.Code == TextExtractionWarningCodes.ContentTypeMismatch)
+                run.Issues.Add(new ValidationIssue(ValidationSeverity.Warning, "CONTENT_TYPE_MISMATCH",
+                    $"{item.DisplayName}: the content does not match its file type ({warning.Message ?? warning.Source}).", item.Id));
 
         if (!extraction.Success && extraction.NotText)
         {
@@ -722,6 +754,8 @@ public sealed class ConnectivityPipeline
         public bool SourceRefsTruncated { get; set; }
         public int Unchanged { get; set; }
         public int RetriesPending { get; set; }
+        /// <summary>Set when the source refused its credential (A2): the run stopped there, and the report says so in this field.</summary>
+        public string? ConfigurationFailure { get; set; }
         public List<(string DocId, string Version)> PendingVersions { get; } = [];
         /// <summary>Archives handled this run: their children, or null when fetching or expanding failed.</summary>
         public Dictionary<string, List<string>?> ExpandedChildren { get; } = new(StringComparer.Ordinal);
@@ -776,7 +810,8 @@ public sealed class ConnectivityPipeline
             SeenSourceRefs: SeenSourceRefs,
             SourceRefsTruncated: SourceRefsTruncated,
             ItemsUnchanged: Unchanged,
-            RetriesPending: RetriesPending);
+            RetriesPending: RetriesPending,
+            ConfigurationFailure: ConfigurationFailure);
     }
 
     private static NormalisedDocument Normalise(SourceItem item, TextExtractionResult extraction, PipelineOptions options, string sourceType)

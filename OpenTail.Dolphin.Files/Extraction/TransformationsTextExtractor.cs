@@ -24,7 +24,21 @@ public sealed class TransformationsTextExtractor : ITextExtractor
                 NotText: result.ErrorKind is TT.ExtractionErrorKind.Binary or TT.ExtractionErrorKind.NeedsOcr);
 
         var metadata = ConvertMetadata(result.Metadata);
-        return new TextExtractionResult(true, result.Text ?? string.Empty, null, metadata);
+        return new TextExtractionResult(true, result.Text ?? string.Empty, null, metadata, Warnings: ConvertWarnings(result.Warnings));
+    }
+
+    /// <summary>B4: the library's warnings, passed through. Its content-type mismatch becomes Dolphin's own code, so the pipeline does not depend
+    /// on the library's constant; every other code is passed on unchanged.</summary>
+    internal static IReadOnlyList<TextExtractionWarning>? ConvertWarnings(IEnumerable<TT.ExtractionWarning>? warnings)
+    {
+        if (warnings is null) return null;
+        var list = warnings
+            .Select(w => new TextExtractionWarning(
+                w.Code == TT.ExtractionWarningCodes.ContentTypeMismatch ? TextExtractionWarningCodes.ContentTypeMismatch : w.Code,
+                w.Source,
+                w.Message))
+            .ToList();
+        return list.Count == 0 ? null : list;
     }
 
     private static IReadOnlyDictionary<string, string>? ConvertMetadata(object? metadata)

@@ -25,4 +25,5 @@ public sealed record IngestionReport(
     IReadOnlyList<string>? SeenSourceRefs = null,
     bool SourceRefsTruncated = false,
     int ItemsUnchanged = 0,
-    int RetriesPending = 0);
+    int RetriesPending = 0,
+    string? ConfigurationFailure = null);

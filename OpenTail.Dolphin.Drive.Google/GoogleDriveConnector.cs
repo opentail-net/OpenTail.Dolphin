@@ -18,7 +18,7 @@ namespace OpenTail.Dolphin.Drive.Google;
 /// Google types other than Docs, Sheets and Slides produce nothing. Docs and Slides are exported as text, Sheets as .xlsx. Every
 /// request carries the shared-drive flags: without them shared-drive files are silently invisible.
 /// </remarks>
-public sealed class GoogleDriveConnector : IIncrementalSourceConnector
+public sealed class GoogleDriveConnector : IIncrementalSourceConnector, OpenTail.Dolphin.Files.Contracts.IConnectionCheck
 {
     private const string Api = "https://www.googleapis.com/drive/v3/";
     private const string TokenInfo = "https://oauth2.googleapis.com/tokeninfo";
@@ -513,7 +513,24 @@ public sealed class GoogleDriveConnector : IIncrementalSourceConnector
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await CheckedTokenAsync(ct).ConfigureAwait(false));
             var response = await _http.SendAsync(request, completion, ct).ConfigureAwait(false);
             if (!await IsRateLimitedAsync(response, ct).ConfigureAwait(false))
+            {
+                // 11b-2: an access token can expire between one request and the next. A 401 on the first attempt gets one more attempt, with
+                // whatever token the callback gives now (the callback is asked again on every attempt).
+                if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0)
+                {
+                    response.Dispose();
+                    continue;
+                }
+                // A2: a refused token (401), or a 403 that says the sign-in lacks the scope or permission, stops the run. A quota 403 is a
+                // rate limit, handled above, and any other 403 is one file the sign-in cannot read, which is not a configuration failure.
+                if (await IsCredentialRefusalAsync(response, ct).ConfigureAwait(false))
+                {
+                    response.Dispose();
+                    throw new OpenTail.Dolphin.Files.Contracts.SourceConfigurationException(
+                        "Google Drive refused the sign-in (" + (int)response.StatusCode + "): it is no longer valid, or it lacks the Drive scope or permission.");
+                }
                 return response;
+            }
 
             var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(Math.Min(60, Math.Pow(2, attempt)));
             response.Dispose();
@@ -535,10 +552,75 @@ public sealed class GoogleDriveConnector : IIncrementalSourceConnector
         return body.Contains("rateLimitExceeded", StringComparison.Ordinal) || body.Contains("userRateLimitExceeded", StringComparison.Ordinal);
     }
 
+    /// <summary>A1: one read-only request for the account's Drive details, with the token a run uses. No retry loop, so the check answers at once.</summary>
+    public async Task<OpenTail.Dolphin.Files.Contracts.ConnectionCheckResult> CheckConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        string? token = null;
+        try
+        {
+            // The token is taken first, so a failure at any later step can still be redacted.
+            token = await _token(cancellationToken).ConfigureAwait(false);
+            token = await CheckedTokenAsync(token, cancellationToken).ConfigureAwait(false);
+            using var response = await CheckRequestAsync(token, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                // 11b-2: one more attempt with the token the callback gives now, as the run does, before a 401 is called a failure of the sign-in.
+                token = await CheckedTokenAsync(await _token(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+                using var second = await CheckRequestAsync(token, cancellationToken).ConfigureAwait(false);
+                return await ClassifyCheckAsync(second, cancellationToken).ConfigureAwait(false);
+            }
+            return await ClassifyCheckAsync(response, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // 11b-3: error text can carry the token; it goes through the redactor before it leaves the connector.
+            return new(OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.Failed, new OpenTail.Dolphin.Files.Inbox.CredentialRedactor(token).Redact(ex.Message));
+        }
+    }
+
+    private async Task<HttpResponseMessage> CheckRequestAsync(string token, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(Api + "about?fields=user"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<OpenTail.Dolphin.Files.Contracts.ConnectionCheckResult> ClassifyCheckAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (await IsRateLimitedAsync(response, cancellationToken).ConfigureAwait(false))
+            return new(OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.RateLimited, "Drive is rate-limiting this sign-in; try the check again later.");
+        if (await IsCredentialRefusalAsync(response, cancellationToken).ConfigureAwait(false))
+            return new(OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.ConfigurationFailure,
+                "Drive refused the sign-in: it is no longer valid, or it lacks the Drive scope or permission.");
+        return response.IsSuccessStatusCode
+            ? new(OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.Ok, "The sign-in can read Drive (read-only).")
+            : new(OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.Failed, "Drive answered " + (int)response.StatusCode + ".");
+    }
+
+    /// <summary>True for an answer that refuses the sign-in itself: a 401, or a 403 whose body names insufficient permissions (a scope or access
+    /// problem for the whole run). Any other 403 is about one item, and is left to the caller. The body was buffered by <see cref="IsRateLimitedAsync"/>.</summary>
+    private static async Task<bool> IsCredentialRefusalAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            return true;
+        if (response.StatusCode != HttpStatusCode.Forbidden)
+            return false;
+        await response.Content.LoadIntoBufferAsync(ct).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        return body.Contains("insufficientPermissions", StringComparison.Ordinal);
+    }
+
     /// <summary>The token, checked once against Google's token-info endpoint: any Drive scope other than read-only is refused.</summary>
     private async Task<string> CheckedTokenAsync(CancellationToken ct)
+        => await CheckedTokenAsync(await _token(ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+
+    /// <summary>The check of a token already taken. The caller holds the token, so a failure in this step can still be redacted.</summary>
+    private async Task<string> CheckedTokenAsync(string token, CancellationToken ct)
     {
-        var token = await _token(ct).ConfigureAwait(false);
         if (token == _checkedToken)
             return token;
 

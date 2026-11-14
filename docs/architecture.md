@@ -76,6 +76,10 @@ A source that implements `IIncrementalSourceConnector` streams changes since a c
   **flushes every exporter and only then saves the cursor**. At the end of the stream, or at `MaxItemsProcessed`, it commits the
   last checkpoint reached.
 - Each save carries the version it loaded; if another run saved meanwhile, `SyncConflictException` and nothing is saved.
+- A refused sign-in (`SourceConfigurationException`, thrown by a connector on a 401 that stays after one fresh token, or a 403 that
+  the provider names as a token or scope or permission problem) **stops the run** (ingestion-ideas A2). A 403 on one item does not. Nothing goes on the retry list, the cursor is not saved past the last
+  commit, and `IngestionReport.ConfigurationFailure` says why. Exporters still flush what was already exported. A throttling answer
+  (429, or a provider's quota error) is never this: it is an ordinary failed fetch.
 - A failed fetch (network, throttling) adds the item to a **retry list** stored with the cursor (up to `SyncOptions.MaxRetryItems`,
   default 100; when the list is full the cursor is held instead of moving past the item). Each run first retries listed items,
   through `FetchAsync`, before reading new changes. After `MaxItemAttempts` (default 5), a permanently failing item is dropped

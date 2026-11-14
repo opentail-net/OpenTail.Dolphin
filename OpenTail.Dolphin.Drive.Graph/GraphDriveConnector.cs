@@ -16,7 +16,7 @@ namespace OpenTail.Dolphin.Drive.Graph;
 /// or is renamed while paths matter (a root folder or patterns) makes it list the drive again. The same item may appear more than once in a feed; the stable ids make the repeat an
 /// overwrite. Download URLs are fetched per file and downloaded without the Graph token.
 /// </remarks>
-public sealed class GraphDriveConnector : IIncrementalSourceConnector
+public sealed class GraphDriveConnector : IIncrementalSourceConnector, OpenTail.Dolphin.Files.Contracts.IConnectionCheck
 {
     private const string Scope = "https://graph.microsoft.com/.default";
 
@@ -205,8 +205,15 @@ public sealed class GraphDriveConnector : IIncrementalSourceConnector
             var url = await DownloadUrlAsync(driveId, itemId, item.DisplayName, cancellationToken).ConfigureAwait(false);
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             using var response = await _download.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden && attempt == 0)
-                continue; // the URL expired between listing and download: get a fresh one, once
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                // The URL may have expired between listing and download: get a fresh one, once, for either refusal.
+                if (attempt == 0) continue;
+                // A2/11b-1: a 401 refused twice is the sign-in, so the run stops. A 403 refused twice is this item: an ordinary failure below.
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                    throw new OpenTail.Dolphin.Files.Contracts.SourceConfigurationException(
+                        $"Graph refused the download of {item.DisplayName} twice (401): the sign-in is no longer valid, or it lacks access to the drive.");
+            }
             if (!response.IsSuccessStatusCode)
                 throw new HttpRequestException($"Downloading {item.DisplayName} failed with {(int)response.StatusCode}.");
 
@@ -379,6 +386,62 @@ public sealed class GraphDriveConnector : IIncrementalSourceConnector
         return _scopeRootId = folder["id"]?.GetValue<string>() ?? throw new InvalidDataException("Graph returned no id for the root folder.");
     }
 
+    /// <summary>A1: one read-only request for the configured drive, with the token a run uses; no retry loop, so the check answers at once. For a
+    /// drive named by a site or a user, the check resolves the drive through the connector's own read, which may retry throttling.</summary>
+    public async Task<OpenTail.Dolphin.Files.Contracts.ConnectionCheckResult> CheckConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        var ok = OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.Ok;
+        try
+        {
+            if (_target is GraphDriveTarget.Drive drive)
+            {
+                using var response = await CheckSendAsync(new Uri(_baseUri, "drives/" + Uri.EscapeDataString(drive.DriveId) + "?$select=id"), cancellationToken)
+                    .ConfigureAwait(false);
+                if (response.StatusCode is (HttpStatusCode)429 or HttpStatusCode.ServiceUnavailable)
+                    return new(OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.RateLimited, "Graph is throttling this sign-in; try the check again later.");
+                // The same rule as the run: a 401, or a 403 that names the token, is a configuration failure; any other refusal is a failure.
+                await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+                return new(ok, "The sign-in can read the configured drive (read-only).");
+            }
+
+            await ResolveDriveAsync(cancellationToken).ConfigureAwait(false);
+            return new(ok, "The sign-in can resolve the configured drive (read-only).");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OpenTail.Dolphin.Files.Contracts.SourceConfigurationException ex)
+        {
+            return new(OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.ConfigurationFailure, Redact(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return new(OpenTail.Dolphin.Files.Contracts.ConnectionCheckStatus.Failed, Redact(ex.Message));
+        }
+    }
+
+    /// <summary>11b-2: one read with the run's token; a 401 gets one fresh token before the answer counts.</summary>
+    private async Task<HttpResponseMessage> CheckSendAsync(Uri uri, CancellationToken ct)
+    {
+        var response = await GetWithTokenAsync(uri, ct).ConfigureAwait(false);
+        if (response.StatusCode != HttpStatusCode.Unauthorized)
+            return response;
+        response.Dispose();
+        _token = null;
+        return await GetWithTokenAsync(uri, ct).ConfigureAwait(false);
+    }
+
+    private async Task<HttpResponseMessage> GetWithTokenAsync(Uri uri, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TokenAsync(ct).ConfigureAwait(false));
+        return await _graph.SendAsync(request, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>11b-3: a check message never carries the bearer token, even when a library puts it into an exception text.</summary>
+    private string Redact(string message) => new OpenTail.Dolphin.Files.Inbox.CredentialRedactor(_token?.Token).Redact(message);
+
     private async Task<string> ResolveDriveAsync(CancellationToken ct)
     {
         if (_driveId is not null)
@@ -446,11 +509,21 @@ public sealed class GraphDriveConnector : IIncrementalSourceConnector
     {
         var ceiling = _options.MaxThrottleWait ?? TimeSpan.FromMinutes(10);
         var throttled = throttledSoFar;
+        var refreshed = false;
         while (true)
         {
             var request = new HttpRequestMessage(HttpMethod.Get, uri);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await TokenAsync(ct).ConfigureAwait(false));
             var response = await _graph.SendAsync(request, ct).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.Unauthorized && !refreshed)
+            {
+                // 11b-2: an expired access token gets one fresh token. A second 401 is left to EnsureSuccessAsync, a configuration failure.
+                refreshed = true;
+                response.Dispose();
+                request.Dispose();
+                _token = null;
+                continue;
+            }
             if (response.StatusCode is not ((HttpStatusCode)429 or HttpStatusCode.ServiceUnavailable))
                 return new Sent(response, throttled);
 
@@ -513,8 +586,20 @@ public sealed class GraphDriveConnector : IIncrementalSourceConnector
             return;
         var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         var code = JsonNodeOrNull(body)?["error"]?["code"]?.GetValue<string>();
-        throw new HttpRequestException($"Graph returned {(int)response.StatusCode}{(code is null ? "" : " (" + code + ")")}.", null, response.StatusCode);
+        var message = $"Graph returned {(int)response.StatusCode}{(code is null ? "" : " (" + code + ")")}.";
+        if (IsConfigurationRefusal(response.StatusCode, code))
+            throw new OpenTail.Dolphin.Files.Contracts.SourceConfigurationException(
+                message + " The sign-in is no longer valid, or it lacks the access the run needs.");
+        throw new HttpRequestException(message, null, response.StatusCode);
     }
+
+    /// <summary>
+    /// 11b-1: which refusals end the run. A 401 is the token itself (after its one fresh try). A 403 is the token only when Graph names
+    /// it: InvalidAuthenticationToken or Authorization_RequestDenied. Any other 403 (accessDenied on one folder or item) is an ordinary failure.
+    /// </summary>
+    internal static bool IsConfigurationRefusal(HttpStatusCode status, string? code) =>
+        status == HttpStatusCode.Unauthorized
+        || (status == HttpStatusCode.Forbidden && code is ("InvalidAuthenticationToken" or "Authorization_RequestDenied"));
 
     private static JsonNode? JsonNodeOrNull(string text)
     {
