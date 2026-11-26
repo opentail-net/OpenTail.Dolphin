@@ -51,7 +51,10 @@ jobs:
         run: |
           dotnet test --project OpenTail.Dolphin.Tests.RabbitMQ -c Release --no-build 2>&1 | tee test.log
           status=${PIPESTATUS[0]}
+          # Skipped by design, once per target framework (the summary sums across them): the five key-deduplication checks (no
+          # DeduplicatesKeys) and the two that list running jobs (no ListsRunningJobs).
+          tfms=$(dotnet msbuild OpenTail.Dolphin.Tests.RabbitMQ/OpenTail.Dolphin.Tests.RabbitMQ.csproj -getProperty:TargetFrameworks | tr ';' '\n' | grep -c .)
+          expected=$((7 * tfms))
           skipped=$(grep -Eo "skipped: [0-9]+" test.log | grep -Eo "[0-9]+" | tail -1)
-          # Skipped by design: the five key-deduplication checks (no DeduplicatesKeys) and the two that list running jobs (no ListsRunningJobs).
-          if [ "${skipped:-0}" != "7" ]; then echo "::error::Expected exactly 7 skipped tests, got ${skipped:-0}"; exit 1; fi
+          if [ "${skipped:-0}" != "$expected" ]; then echo "::error::Expected exactly $expected skipped tests ($tfms target frameworks), got ${skipped:-0}"; exit 1; fi
           exit $status

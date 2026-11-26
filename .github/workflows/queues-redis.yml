@@ -58,11 +58,13 @@ jobs:
           OTAIL_QUEUE_REDIS: localhost:6379
           OTAIL_QUEUE_VALKEY: localhost:6380
           OTAIL_QUEUE_RABBITMQ: amqp://guest:guest@localhost:5672/
-        # Skipped by design: the RabbitMQ suite's seven checks for capabilities it does not declare. Anything else skipped means a
-        # server variable is missing: fail rather than pass quietly.
+        # Skipped by design: the RabbitMQ suite's seven checks for capabilities it does not declare, once per target framework (the summary
+        # sums across them). Anything else skipped means a server variable is missing: fail rather than pass quietly.
         run: |
           dotnet test --project OpenTail.Dolphin.Tests.Redis -c Release --no-build 2>&1 | tee test.log
           status=${PIPESTATUS[0]}
+          tfms=$(dotnet msbuild OpenTail.Dolphin.Tests.Redis/OpenTail.Dolphin.Tests.Redis.csproj -getProperty:TargetFrameworks | tr ';' '\n' | grep -c .)
+          expected=$((7 * tfms))
           skipped=$(grep -Eo "skipped: [0-9]+" test.log | grep -Eo "[0-9]+" | tail -1)
-          if [ "${skipped:-0}" != "7" ]; then echo "::error::Expected exactly 7 skipped tests, got ${skipped:-0}"; exit 1; fi
+          if [ "${skipped:-0}" != "$expected" ]; then echo "::error::Expected exactly $expected skipped tests ($tfms target frameworks), got ${skipped:-0}"; exit 1; fi
           exit $status
