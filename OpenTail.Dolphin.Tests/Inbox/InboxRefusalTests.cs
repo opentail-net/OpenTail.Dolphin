@@ -1,4 +1,5 @@
 using System.Net;
+using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Http;
 using Google.Apis.Services;
@@ -9,7 +10,7 @@ using OpenTail.Dolphin.Inbox.Graph;
 namespace OpenTail.Dolphin.Tests.Inbox;
 
 /// <summary>
-/// Batch 14 (A2 on the inbox adapters): a refused sign-in stops a read as a configuration failure, and an item-level or quota refusal does
+/// Ingestion ideas A2 (section 6) on the inbox adapters: a refused sign-in stops a read as a configuration failure, and an item-level or quota refusal does
 /// not. Each adapter is tested against a fake provider that refuses every request with one status and one reason.
 /// </summary>
 public sealed class InboxRefusalTests
@@ -153,5 +154,24 @@ public sealed class InboxRefusalTests
         var ex = await Assert.ThrowsAnyAsync<Exception>(() => ReadAsync(Gmail(handler)));
 
         Assert.IsNotType<SourceConfigurationException>(ex);
+    }
+
+    [Fact]
+    public async Task Gmail_refresh_token_the_provider_no_longer_accepts_stops_the_read_as_a_configuration_failure()
+    {
+        // The credential throws while it refreshes, inside the read, before any Gmail request is made.
+        var adapter = new GmailInboxAdapter(GmailSettings.Create("id", "secret", "refresh", "me@example.com"), "t")
+        {
+            ServiceForTests = () => throw new TokenResponseException(new TokenErrorResponse { Error = "invalid_grant" }),
+        };
+
+        await Assert.ThrowsAsync<SourceConfigurationException>(() => ReadAsync(adapter));
+    }
+
+    [Fact]
+    public void Gmail_token_endpoint_answers_for_the_grant_or_the_client_are_the_sign_in_and_other_answers_are_not()
+    {
+        Assert.IsType<SourceConfigurationException>(GmailInboxAdapter.Refusal(new TokenResponseException(new TokenErrorResponse { Error = "invalid_client" })));
+        Assert.Null(GmailInboxAdapter.Refusal(new TokenResponseException(new TokenErrorResponse { Error = "invalid_request" })));
     }
 }

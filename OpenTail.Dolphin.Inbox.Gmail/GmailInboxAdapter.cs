@@ -36,19 +36,27 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
         _pending = null;
     }
 
-    /// <summary>Batch 14: a refused sign-in (a 401, or a 403 that names insufficient permissions) is a configuration failure, so the read stops
-    /// as one. Any other failure passes through as it was. The credential is built once per read, so a refusal is not retried within it.</summary>
+    /// <summary>A refused sign-in is a configuration failure, so the read stops as one: a 401, a 403 that names insufficient permissions, or a
+    /// token endpoint answer that the refresh token or the client is no longer accepted. Any other failure passes through as it was. The
+    /// credential is built once per read, so a refusal is not retried within it.</summary>
     public IAsyncEnumerable<InboxEmailRecord> FetchRecentAsync(InboxFetchOptions options, CancellationToken cancellationToken = default)
         => OpenTail.Dolphin.Files.Inbox.ProviderRefusal.ClassifyAsync(FetchCoreAsync(options, cancellationToken), Refusal, cancellationToken);
 
     /// <summary>The refusal a Gmail answer means, or null for every other failure.</summary>
-    internal static Exception? Refusal(Exception ex) =>
-        ex is Google.GoogleApiException g
-        && (g.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized
-            || (g.HttpStatusCode == System.Net.HttpStatusCode.Forbidden && g.Error?.Errors?.Any(e => e.Reason == "insufficientPermissions") == true))
+    internal static Exception? Refusal(Exception ex)
+    {
+        // A revoked or expired refresh token, or a wrong client, is answered by the token endpoint (RFC 6749 errors) before any API call.
+        if (ex is Google.Apis.Auth.OAuth2.Responses.TokenResponseException { Error.Error: "invalid_grant" or "invalid_client" })
+            return new OpenTail.Dolphin.Files.Contracts.SourceConfigurationException(
+                "Gmail refused the sign-in: the refresh token or the client is no longer accepted.", ex);
+        if (ex is not Google.GoogleApiException g) return null;
+        var refused = g.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized
+            || (g.HttpStatusCode == System.Net.HttpStatusCode.Forbidden && g.Error?.Errors?.Any(e => e.Reason == "insufficientPermissions") == true);
+        return refused
             ? new OpenTail.Dolphin.Files.Contracts.SourceConfigurationException(
                 $"Gmail refused the sign-in ({(int)g.HttpStatusCode}): it is no longer valid, or it lacks the Gmail scope.", ex)
             : null;
+    }
 
     private async IAsyncEnumerable<InboxEmailRecord> FetchCoreAsync(
         InboxFetchOptions options,

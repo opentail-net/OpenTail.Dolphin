@@ -41,9 +41,9 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
     /// continues from the saved link: a delta link (all changes since), or a next link when <see cref="InboxFetchOptions.MaxMessages"/>
     /// stopped the last run, so a backlog is read run by run instead of skipped. Pages are asked for at most MaxMessages long.
     /// MaxMessages is a soft cap: the run stops at the first page boundary after it is reached, so a page is emitted whole.
+    /// A refused sign-in (a 401, or a 403 that Graph names as a token or permission problem) is a configuration failure, and the read
+    /// stops as one. Any other failure passes through as it was.
     /// </summary>
-    /// <summary>Batch 14: a refused sign-in (a 401, or a 403 that Graph names as a token or permission problem) is a configuration failure, and the
-    /// read stops as one. Any other failure passes through as it was.</summary>
     public IAsyncEnumerable<InboxEmailRecord> FetchRecentAsync(InboxFetchOptions options, CancellationToken cancellationToken = default)
         => OpenTail.Dolphin.Files.Inbox.ProviderRefusal.ClassifyAsync(FetchCoreAsync(options, cancellationToken), Refusal, cancellationToken);
 

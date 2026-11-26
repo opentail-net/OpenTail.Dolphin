@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 namespace OpenTail.Dolphin.Files.Inbox;
 
 /// <summary>
-/// Batch 14 (ingestion ideas, A2 on the inbox adapters). An inbox adapter's read is an enumeration, and a provider's refusal arrives as an
+/// Ingestion ideas A2 (docs/design/ingestion-ideas-2026-11.md, section 6) on the inbox adapters. An adapter's read is an enumeration, and a provider's refusal arrives as an
 /// exception from inside it. A try block cannot wrap a yield, so this moves each step of the enumeration into a guarded call and yields the
 /// element outside it. The adapter supplies the classification: it returns the <see cref="SourceConfigurationException"/> for a refused
 /// sign-in, or null for anything else, which is then rethrown as it was.

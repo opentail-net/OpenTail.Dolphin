@@ -281,6 +281,12 @@ Nothing is started. In order, with the corrections of section 9 applied. Tick a 
     when Graph names `InvalidAuthenticationToken` or `Authorization_RequestDenied`; any other 403 is one item, an ordinary failure).
     **Not verified (to check against Microsoft's error documentation):** that those two error codes are the token-level refusals the
     rule names; they come from the connector's author, not from a read of the documentation.
+    **Batch 14, the inbox adapters:** Gmail: a 401, a 403 that names `insufficientPermissions`, and a token-endpoint `invalid_grant` or
+    `invalid_client` (a revoked refresh token; `GmailInboxAdapter.Refusal`). Graph: a 401, and an ODataError 403 that names
+    `InvalidAuthenticationToken` or `Authorization_RequestDenied`. On the Graph delta path a 403 stays an ordinary failure, because the
+    SDK gives no error body there (`InboxRefusalTests`). Checked on 2026-11-26 from Microsoft Learn search results, not a full read of the
+    pages: `Authorization_RequestDenied` is a 403 for an app or user without the permissions the call needs, and `InvalidAuthenticationToken`
+    a 401 for a missing, invalid or expired token. Read the pages in full before the codes are relied on further.
     One open box per connector not yet changed (the object-store clients are shared with the exporters, so the call site must decide):
     - [ ] Azure Blob object-store client (`AzureBlobObjectStoreClient`)
     - [ ] S3 object-store client (`S3ObjectStoreClient`)
@@ -296,11 +302,12 @@ Nothing is started. In order, with the corrections of section 9 applied. Tick a 
     - [ ] Twitter connector (`TwitterConnector`)
     - [ ] RSS feed connector (`RssFeedConnector`)
     - [ ] Site crawl connector (`SiteCrawlConnector`)
-    - [ ] Gmail inbox adapter (`GmailInboxAdapter`)
-    - [ ] Graph inbox adapter (`GraphInboxAdapter`)
+    - [x] Gmail inbox adapter (`GmailInboxAdapter`), batch 14
+    - [x] Graph inbox adapter (`GraphInboxAdapter`), batch 14
     - [ ] IMAP inbox adapter (`ImapInboxAdapter`)
-  - [ ] Pass the error text to `TrackRetry` directly. **Not done:** the configuration path does not call `TrackRetry`; `TrackRetry`
-    still reads the last error line, which is right for the ordinary failure path (section 9).
+  - [x] Pass the error text to `TrackRetry` directly, batch 14: the retry takes the fetch's own text (`FetchFailure`), not the run's last
+    error line. In the code as it stood, both gave the same text, because no path adds an error line after a failed fetch; the change
+    guards against a future path that does, and no test shows a difference.
   - [x] Tests: a refused fetch and a refused stream stop the run and leave the cursor and the retry list where they were
     (`ConfigurationStopTests`); a throttling answer is not one (`ConfigurationStopTests`).
 - [x] **B4. Type mismatch in the main pipeline** (goes with A2). Built in batch 11.
