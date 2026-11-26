@@ -70,14 +70,22 @@ public sealed class InboxRefusalTests
         await Assert.ThrowsAsync<SourceConfigurationException>(() => ReadAsync(Graph(new RefusingGraph(HttpStatusCode.Unauthorized, "InvalidAuthenticationToken"))));
     }
 
-    /// <summary>The limit, recorded as a test: on this path the SDK gives a plain ApiException without the body, so a 403 that names the token is
-    /// not identified here. It stays an ordinary failure until the SDK surfaces its code (report: not verified end to end).</summary>
     [Fact]
-    public async Task Graph_403_that_names_the_token_stays_ordinary_on_the_delta_path_where_the_SDK_does_not_surface_its_code()
+    public void Graph_client_secret_the_token_endpoint_refuses_is_a_configuration_failure_and_other_token_failures_are_not()
     {
-        var ex = await Assert.ThrowsAnyAsync<Exception>(() => ReadAsync(Graph(new RefusingGraph(HttpStatusCode.Forbidden, "Authorization_RequestDenied"))));
+        var refused = new Azure.Identity.AuthenticationFailedException("ClientSecretCredential authentication failed: ",
+            new Microsoft.Identity.Client.MsalServiceException("invalid_client", "AADSTS7000215: Invalid client secret is provided."));
+        var other = new Azure.Identity.AuthenticationFailedException("ClientSecretCredential authentication failed: ",
+            new Microsoft.Identity.Client.MsalServiceException("server_error", "AADSTS50000: There was an issue with the server."));
 
-        Assert.IsNotType<SourceConfigurationException>(ex);
+        Assert.IsType<SourceConfigurationException>(GraphInboxAdapter.Refusal(refused));
+        Assert.Null(GraphInboxAdapter.Refusal(other));
+    }
+
+    [Fact]
+    public async Task Graph_403_that_names_the_permission_is_a_configuration_failure_on_the_first_page()
+    {
+        await Assert.ThrowsAsync<SourceConfigurationException>(() => ReadAsync(Graph(new RefusingGraph(HttpStatusCode.Forbidden, "Authorization_RequestDenied"))));
     }
 
     [Fact]

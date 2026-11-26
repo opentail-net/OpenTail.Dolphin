@@ -9,6 +9,13 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
     private GraphSyncState? _pending;
     private GraphServiceClient? _client;
 
+    /// <summary>Graph's error body becomes an ODataError on every read. Without this map, the SDK throws a plain ApiException with no body
+    /// for the requests that send no mapping, so the 403 check would never see Graph's code.</summary>
+    private static readonly Dictionary<string, Microsoft.Kiota.Abstractions.Serialization.ParsableFactory<Microsoft.Kiota.Abstractions.Serialization.IParsable>> ErrorMappings = new()
+    {
+        ["XXX"] = Microsoft.Graph.Models.ODataErrors.ODataError.CreateFromDiscriminatorValue,
+    };
+
     public GraphInboxAdapter(GraphSettings settings, string tenantContext, GraphSyncStateStore? syncStore = null,
         InboxSyncCommit? commit = null)
     {
@@ -48,8 +55,8 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
         => OpenTail.Dolphin.Files.Inbox.ProviderRefusal.ClassifyAsync(FetchCoreAsync(options, cancellationToken), Refusal, cancellationToken);
 
     /// <summary>The refusal a Graph answer means, or null for every other failure. A 401 is the sign-in. A 403 is the sign-in only when Graph's
-    /// error code (on an ODataError) names the token or the permission. The SDK does not always surface that error: on the delta path an
-    /// answer arrives as a plain ApiException without its body, so a 403 there is left as an ordinary failure rather than guessed at.</summary>
+    /// error code (on an ODataError) names the token or the permission. Every read maps Graph's error body to ODataError, on the first page and
+    /// on the next pages alike (see ErrorMappings).</summary>
     internal static Exception? Refusal(Exception ex)
     {
         if (ex is Microsoft.Kiota.Abstractions.ApiException api && api.ResponseStatusCode == 401)
@@ -57,6 +64,12 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
         if (ex is Microsoft.Graph.Models.ODataErrors.ODataError odata
             && odata.ResponseStatusCode == 403 && odata.Error?.Code is "InvalidAuthenticationToken" or "Authorization_RequestDenied")
             return Config(odata);
+        // Azure.Identity wraps a failed token request as AuthenticationFailedException, with the MSAL service error as its inner exception
+        // (Azure.Core: CredentialDiagnosticScope.TryWrapException). MSAL takes that error's code from the token endpoint's "error" field
+        // (MSAL: OAuth2Client). invalid_client is the client secret refused, wrong or expired. Other token failures stay ordinary.
+        if (ex is Azure.Identity.AuthenticationFailedException
+            && ex.InnerException is Microsoft.Identity.Client.MsalServiceException { ErrorCode: "invalid_client" })
+            return Config(ex);
         return null;
     }
 
@@ -128,7 +141,7 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
                 if (options.Since is { } since)
                     req.QueryParameters.Filter = $"receivedDateTime ge {since.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}";
             });
-        return client.RequestAdapter.SendAsync(requestInfo, MessageCollectionResponse.CreateFromDiscriminatorValue, cancellationToken: ct);
+        return client.RequestAdapter.SendAsync(requestInfo, MessageCollectionResponse.CreateFromDiscriminatorValue, errorMapping: ErrorMappings, cancellationToken: ct);
     }
 
     private GraphServiceClient GetClient()
@@ -159,6 +172,7 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
         return client.RequestAdapter.SendAsync(
             requestInfo,
             MessageCollectionResponse.CreateFromDiscriminatorValue,
+            errorMapping: ErrorMappings,
             cancellationToken: ct);
     }
 

@@ -283,8 +283,13 @@ Nothing is started. In order, with the corrections of section 9 applied. Tick a 
     rule names; they come from the connector's author, not from a read of the documentation.
     **Batch 14, the inbox adapters:** Gmail: a 401, a 403 that names `insufficientPermissions`, and a token-endpoint `invalid_grant` or
     `invalid_client` (a revoked refresh token; `GmailInboxAdapter.Refusal`). Graph: a 401, and an ODataError 403 that names
-    `InvalidAuthenticationToken` or `Authorization_RequestDenied`. On the Graph delta path a 403 stays an ordinary failure, because the
-    SDK gives no error body there (`InboxRefusalTests`). Checked on 2026-11-26 from Microsoft Learn search results, not a full read of the
+    `InvalidAuthenticationToken` or `Authorization_RequestDenied`, on the first page and the next pages alike (`ErrorMappings`; before
+    the review of 2026-11-26 the next-page and first-page requests sent no error mapping, so the ODataError check never ran in a read).
+    Graph also: an `AuthenticationFailedException` from Azure.Identity whose inner MSAL error is `invalid_client` (a wrong or expired
+    client secret). Source read on 2026-11-26: Azure.Core `CredentialDiagnosticScope.TryWrapException` (the inner exception is kept;
+    the message holds only the MSAL message for two error codes) and MSAL `OAuth2Client` (the token endpoint's `error` becomes the
+    `ErrorCode`). Not verified: that Kiota passes the Azure.Identity exception through unchanged, and that a live tenant answers a bad
+    secret with `invalid_client`. The tests build the exception directly (`InboxRefusalTests`). Checked on 2026-11-26 from Microsoft Learn search results, not a full read of the
     pages: `Authorization_RequestDenied` is a 403 for an app or user without the permissions the call needs, and `InvalidAuthenticationToken`
     a 401 for a missing, invalid or expired token. Read the pages in full before the codes are relied on further.
     One open box per connector not yet changed (the object-store clients are shared with the exporters, so the call site must decide):
