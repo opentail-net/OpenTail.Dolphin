@@ -36,7 +36,21 @@ public sealed class GmailInboxAdapter : IInboxAdapter, IInboxSyncCommit
         _pending = null;
     }
 
-    public async IAsyncEnumerable<InboxEmailRecord> FetchRecentAsync(
+    /// <summary>Batch 14: a refused sign-in (a 401, or a 403 that names insufficient permissions) is a configuration failure, so the read stops
+    /// as one. Any other failure passes through as it was. The credential is built once per read, so a refusal is not retried within it.</summary>
+    public IAsyncEnumerable<InboxEmailRecord> FetchRecentAsync(InboxFetchOptions options, CancellationToken cancellationToken = default)
+        => OpenTail.Dolphin.Files.Inbox.ProviderRefusal.ClassifyAsync(FetchCoreAsync(options, cancellationToken), Refusal, cancellationToken);
+
+    /// <summary>The refusal a Gmail answer means, or null for every other failure.</summary>
+    internal static Exception? Refusal(Exception ex) =>
+        ex is Google.GoogleApiException g
+        && (g.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized
+            || (g.HttpStatusCode == System.Net.HttpStatusCode.Forbidden && g.Error?.Errors?.Any(e => e.Reason == "insufficientPermissions") == true))
+            ? new OpenTail.Dolphin.Files.Contracts.SourceConfigurationException(
+                $"Gmail refused the sign-in ({(int)g.HttpStatusCode}): it is no longer valid, or it lacks the Gmail scope.", ex)
+            : null;
+
+    private async IAsyncEnumerable<InboxEmailRecord> FetchCoreAsync(
         InboxFetchOptions options,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

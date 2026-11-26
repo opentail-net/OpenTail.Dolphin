@@ -42,7 +42,28 @@ public sealed class GraphInboxAdapter : IInboxAdapter, IInboxSyncCommit
     /// stopped the last run, so a backlog is read run by run instead of skipped. Pages are asked for at most MaxMessages long.
     /// MaxMessages is a soft cap: the run stops at the first page boundary after it is reached, so a page is emitted whole.
     /// </summary>
-    public async IAsyncEnumerable<InboxEmailRecord> FetchRecentAsync(
+    /// <summary>Batch 14: a refused sign-in (a 401, or a 403 that Graph names as a token or permission problem) is a configuration failure, and the
+    /// read stops as one. Any other failure passes through as it was.</summary>
+    public IAsyncEnumerable<InboxEmailRecord> FetchRecentAsync(InboxFetchOptions options, CancellationToken cancellationToken = default)
+        => OpenTail.Dolphin.Files.Inbox.ProviderRefusal.ClassifyAsync(FetchCoreAsync(options, cancellationToken), Refusal, cancellationToken);
+
+    /// <summary>The refusal a Graph answer means, or null for every other failure. A 401 is the sign-in. A 403 is the sign-in only when Graph's
+    /// error code (on an ODataError) names the token or the permission. The SDK does not always surface that error: on the delta path an
+    /// answer arrives as a plain ApiException without its body, so a 403 there is left as an ordinary failure rather than guessed at.</summary>
+    internal static Exception? Refusal(Exception ex)
+    {
+        if (ex is Microsoft.Kiota.Abstractions.ApiException api && api.ResponseStatusCode == 401)
+            return Config(api);
+        if (ex is Microsoft.Graph.Models.ODataErrors.ODataError odata
+            && odata.ResponseStatusCode == 403 && odata.Error?.Code is "InvalidAuthenticationToken" or "Authorization_RequestDenied")
+            return Config(odata);
+        return null;
+    }
+
+    private static OpenTail.Dolphin.Files.Contracts.SourceConfigurationException Config(Exception ex) =>
+        new("Graph refused the sign-in: it is no longer valid, or it lacks the Mail access the read needs.", ex);
+
+    private async IAsyncEnumerable<InboxEmailRecord> FetchCoreAsync(
         InboxFetchOptions options,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

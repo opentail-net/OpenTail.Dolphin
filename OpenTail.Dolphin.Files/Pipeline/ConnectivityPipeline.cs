@@ -159,10 +159,10 @@ public sealed class ConnectivityPipeline
             lastCommit = DateTimeOffset.UtcNow;
         }
 
-        // Tracks a failed fetch so the cursor can move on. False when the list is full: the caller holds the cursor instead.
-        bool TrackRetry(SourceItem item)
+        // Tracks a failed fetch so the cursor can move on. False when the list is full: the caller holds the cursor instead. The error is the
+        // fetch's own text, passed in by the caller (batch 14): it is not read back from the run's error lines.
+        bool TrackRetry(SourceItem item, string error)
         {
-            var error = run.Errors.Count > 0 ? run.Errors[^1] : null;
             var entry = retries.Find(r => r.Item.Id == item.Id);
             if (entry is null)
             {
@@ -209,10 +209,11 @@ public sealed class ConnectivityPipeline
 
                 retriedThisRun.Add(entry.Item.Id);
                 // No refs here: the item comes again from a full run's stream, which adds them.
-                var retried = await ProcessAsync(entry.Item, run, exporterFailuresStop: true, sourceRefs: null, ct);
+                var failure = new FetchFailure();
+                var retried = await ProcessAsync(entry.Item, run, exporterFailuresStop: true, sourceRefs: null, ct, failure);
                 unflushed |= NeedsFlush(retried);
                 if (retried == Outcome.FetchFailed)
-                    TrackRetry(entry.Item); // the list already holds it, so this never fails
+                    TrackRetry(entry.Item, failure.Message); // the list already holds it, so this never fails
                 else
                     Untrack(entry.Item.Id);
             }
@@ -250,11 +251,12 @@ public sealed class ConnectivityPipeline
                             break;
                         }
 
-                        var outcome = await ProcessAsync(upsert.Item, run, exporterFailuresStop: true, run.FullRun ? sourceRefs : null, ct);
+                        var failure = new FetchFailure();
+                        var outcome = await ProcessAsync(upsert.Item, run, exporterFailuresStop: true, run.FullRun ? sourceRefs : null, ct, failure);
                         unflushed |= NeedsFlush(outcome);
                         if (outcome == Outcome.FetchFailed)
                         {
-                            if (!TrackRetry(upsert.Item))
+                            if (!TrackRetry(upsert.Item, failure.Message))
                             {
                                 holdCommits = true;
                                 run.Errors.Add($"{upsert.Item.DisplayName}: the retry list is full, so nothing is committed past this item; the next run starts again from the last commit.");
@@ -366,10 +368,18 @@ public sealed class ConnectivityPipeline
     /// <summary><see cref="ExportedSomeRejected"/>: an archive with documents to flush, and entries that failed.</summary>
     private enum Outcome { Exported, Skipped, Rejected, FetchFailed, ExporterFailed, ExportedSomeRejected }
 
+    /// <summary>What a failed fetch says, for the retry list. Filled by <see cref="ProcessAsync"/> and passed to the retry, so the retry never reads
+    /// it back from the run's error lines.</summary>
+    private sealed class FetchFailure
+    {
+        public string Message { get; set; } = "";
+    }
+
     private static bool NeedsFlush(Outcome outcome) => outcome is Outcome.Exported or Outcome.ExportedSomeRejected;
 
     /// <summary>One item, from fetch to export. Counts it in <paramref name="run"/>. Adds an archive's child ids to <paramref name="sourceRefs"/>.</summary>
-    private async Task<Outcome> ProcessAsync(SourceItem item, Run run, bool exporterFailuresStop, SourceRefCollector? sourceRefs, CancellationToken ct)
+    private async Task<Outcome> ProcessAsync(SourceItem item, Run run, bool exporterFailuresStop, SourceRefCollector? sourceRefs, CancellationToken ct,
+        FetchFailure? failure = null)
     {
         var configuredExpander = _options.Expander;
         if (configuredExpander?.ValidateSourceId(item) is { } sourceIdError)
@@ -429,7 +439,9 @@ public sealed class ConnectivityPipeline
         catch (Exception ex)
         {
             run.Failed++;
-            run.Errors.Add($"{item.DisplayName}: {ex.Message}");
+            var text = $"{item.DisplayName}: {ex.Message}";
+            run.Errors.Add(text);
+            if (failure is not null) failure.Message = text;
             if (expander is not null) await ArchiveFailedAsync(item, docId, run, sourceRefs, ct);
             return Outcome.FetchFailed;
         }
