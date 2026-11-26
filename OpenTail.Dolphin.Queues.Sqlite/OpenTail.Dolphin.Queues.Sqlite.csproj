@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
     <Description>OpenTail Dolphin — SQLite work queue: durable across crashes and power cuts (WAL, synchronous=FULL), safe for several workers and processes on one machine. Verification: Tested.</Description>
     <PackageTags>opentail;connectivity;queue;work-queue;sqlite</PackageTags>
   </PropertyGroup>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
     <Description>OpenTail Dolphin — work queues: the IWorkQueue contract (at-least-once, leases, delays, keys, dead letters), an in-memory queue for tests and a conformance suite any implementation must pass. Verification: Tested.</Description>
     <PackageTags>opentail;connectivity;queue;work-queue</PackageTags>
   </PropertyGroup>

@@ -53,7 +53,7 @@ mounted share already works through the folder connector) and Host tools for the
 
 These are the same rules as `docs/ingestion-hardening.md`, repeated so this plan stands alone:
 
-- Repository `C:\Git\split\OpenTail.Dolphin` (.NET 10, `OpenTail.Dolphin.slnx`, xUnit tests in
+- Repository `C:\Git\split\OpenTail.Dolphin` (.NET 10 and 11, `OpenTail.Dolphin.slnx`, xUnit tests in
   `OpenTail.Dolphin.Tests`). Bash builds need `export GITHUB_PACKAGES_TOKEN=$(gh auth token)`.
 - Keep existing contracts. Add types and optional members last; don't change `IObjectStoreClient` or `ObjectStoreReader`'s public
   shape.

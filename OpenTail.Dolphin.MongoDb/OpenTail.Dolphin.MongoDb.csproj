@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
     <Description>OpenTail Dolphin — MongoDB reader: governed read-only queries (collections, find, aggregate, count) over allowed collections, one per query, with an operator allow-list by context, request and response bounds, a server-side time limit and a comment on every operation. Use a login with the read role. Verification: Tested.</Description>
     <PackageTags>opentail;connectivity;mongodb;nosql;read-only</PackageTags>
   </PropertyGroup>

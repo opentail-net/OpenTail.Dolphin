@@ -2,7 +2,7 @@
 
 ## Set up
 
-The .NET SDK version is pinned in `global.json` (10.0.x). Then:
+The .NET SDK version is pinned in `global.json` (11.0.x). The projects target .NET 10 and .NET 11 (`net10.0;net11.0`), and an SDK 11 build covers both. Then:
 
 ```
 dotnet restore OpenTail.Dolphin.slnx

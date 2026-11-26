@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
     <Description>OpenTail Dolphin — Redis/Valkey queue control: IQueueControl shared by every worker of a queue across machines (concurrency slots, circuits, rate starts, cancellations), in atomic Lua scripts on the server's clock. Works with Redis and Valkey. Verification: Tested.</Description>
     <PackageTags>opentail;connectivity;queue;work-queue;redis;valkey</PackageTags>
   </PropertyGroup>
