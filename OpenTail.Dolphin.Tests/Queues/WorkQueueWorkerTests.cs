@@ -350,7 +350,7 @@ public sealed class WorkQueueWorkerTests
         var queue = new InMemoryWorkQueue();
         await queue.EnqueueAsync(new EnqueueRequest(Q, "acme", "beating"), TestContext.Current.CancellationToken);
         await queue.EnqueueAsync(new EnqueueRequest(Q, "acme", "silent"), TestContext.Current.CancellationToken);
-        var options = Options(concurrency: 2, retryBase: TimeSpan.FromSeconds(30)) with { HeartbeatTimeout = TimeSpan.FromMilliseconds(600) }; // wide of the 80 ms beats: CI timers are coarse
+        var options = Options(concurrency: 2, retryBase: TimeSpan.FromSeconds(30)) with { HeartbeatTimeout = TimeSpan.FromSeconds(2) }; // 25 times the 80 ms beat. At 600 ms this failed once on a Windows CI runner (run 45779846599) and passed on the next run
 
         var events = await RunUntilAsync(queue, options, async (job, ct) =>
         {
